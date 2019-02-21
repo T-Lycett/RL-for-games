@@ -14,6 +14,7 @@ class CheckersBoard():
         self.p2_positions = np.zeros((8, 8))
         self.p1_kings = np.zeros((8, 8))
         self.p2_kings = np.zeros((8, 8))
+        self.moves_without_capture = 0
 
     def set_start_positions(self):
         self.reset()
@@ -32,6 +33,7 @@ class CheckersBoard():
         self.p2_positions = board.p2_positions.copy()
         self.p1_kings = board.p1_kings.copy()
         self.p2_kings = board.p2_kings.copy()
+        self.moves_without_capture = board.moves_without_capture
 
     def is_valid_position(self, row, column):
         if row >= 0 and row <= 7 and column >= 0 and column <= 7:
@@ -87,6 +89,7 @@ class CheckersBoard():
         players_kings[start[0], start[1]] = 0
         if (player == 1 and end[0] == 0) or (player == -1 and end[0] == 7):
             players_kings[end[0], end[1]] = 1
+        self.moves_without_capture += 1
         return True
 
     def get_valid_moves_from_pos(self, player, pos):
@@ -137,6 +140,7 @@ class CheckersBoard():
         opponent_kings[x, y] = 0
         if (player == 1 and end[0] == 0) or (player == -1 and end[0] == 7):
             players_kings[end[0], end[1]] = 1
+        self.moves_without_capture = 0
         return True
 
     def is_valid_jump(self, player, start, end):
@@ -226,4 +230,6 @@ class CheckersBoard():
             return True, -1
         if len(self.get_valid_moves(-1)) == 0:
             return True, 1
+        if self.moves_without_capture >= 50:
+            return True, 0
         return False, None
