@@ -72,7 +72,7 @@ class CheckersBoard():
             if abs(start[1] - end[1]) != 1:
                 return False
         else:
-            if abs(start[0] - end[0]) != 1 or abs(start[1] - end[1] != 1): #is not diagonally adjacent
+            if abs(start[0] - end[0]) != 1 or abs(start[1] - end[1]) != 1: #is not diagonally adjacent
                 return False
         return True
 
@@ -164,7 +164,7 @@ class CheckersBoard():
                 if len(chain_jumps) > 0:
                     jumps = np.hstack((jumps, chain_jumps))
                 else:
-                    jumps.append(new_jump)
+                    jumps = np.append(jumps, new_jump)
         if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] - 2]):
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] + 2, pos[1] - 2]):
@@ -172,7 +172,7 @@ class CheckersBoard():
                 if len(chain_jumps) > 0:
                     jumps = np.hstack((jumps, chain_jumps))
                 else:
-                    jumps.append(new_jump)
+                    jumps = np.append(jumps, new_jump)
         if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] + 2]):
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] - 2, pos[1] + 2]):
@@ -180,7 +180,7 @@ class CheckersBoard():
                 if len(chain_jumps) > 0:
                     jumps = np.hstack((jumps, chain_jumps))
                 else:
-                    jumps.append(new_jump)
+                    jumps = np.append(jumps, new_jump)
         if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] - 2]):
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] - 2, pos[1] - 2]):
@@ -188,7 +188,7 @@ class CheckersBoard():
                 if len(chain_jumps) > 0:
                     jumps = np.hstack((jumps, chain_jumps))
                 else:
-                    jumps.append(new_jump)
+                    jumps = np.append(jumps, new_jump)
         return jumps
 
     def get_valid_moves(self, player):
@@ -210,3 +210,20 @@ class CheckersBoard():
             return jumps
         else:
             return valid_moves
+
+    def game_ended(self):
+        p1_pieces = 0
+        for p in self.p1_positions.flat:
+            p1_pieces += p
+        if p1_pieces == 0:
+            return True, -1
+        p2_pieces = 0
+        for p in self.p2_positions.flat:
+            p2_pieces += p
+        if p2_pieces == 0:
+            return True, 1
+        if len(self.get_valid_moves(1)) == 0:
+            return True, -1
+        if len(self.get_valid_moves(-1)) == 0:
+            return True, 1
+        return False, None
