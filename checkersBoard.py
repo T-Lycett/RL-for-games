@@ -15,6 +15,10 @@ class CheckersBoard():
         self.p1_kings = np.zeros((8, 8))
         self.p2_kings = np.zeros((8, 8))
         self.moves_without_capture = 0
+        self.p1_valid_moves = []
+        self.p2_valid_moves = []
+        self.p1_valid_moves_updated = False
+        self.p2_valid_moves_updated = False
 
     def set_start_positions(self):
         self.reset()
@@ -27,13 +31,19 @@ class CheckersBoard():
         self.p2_positions[1, ::2] = 1
         self.p2_positions[2, :] = 1
         self.p2_positions[2, ::2] = 0
+        self.update_valid_moves(1)
+        self.update_valid_moves(-1)
 
     def set_positions(self, board):
         self.p1_positions = board.p1_positions.copy()
         self.p2_positions = board.p2_positions.copy()
         self.p1_kings = board.p1_kings.copy()
         self.p2_kings = board.p2_kings.copy()
+        self.p1_valid_moves = board.p1_valid_moves.copy()
+        self.p2_valid_moves = board.p2_valid_moves.copy()
         self.moves_without_capture = board.moves_without_capture
+        self.p1_valid_moves_updated = board.p1_valid_moves_updated
+        self.p2_valid_moves_updated = board.p2_valid_moves_updated
 
     def is_valid_position(self, row, column):
         if row >= 0 and row <= 7 and column >= 0 and column <= 7:
@@ -79,8 +89,6 @@ class CheckersBoard():
         return True
 
     def execute_move(self, player, start, end):
-        if not self.is_valid_move(player, start, end):
-            return False
         players_positions = self.get_player_positions(player)
         players_kings = self.get_players_kings(player)
         players_positions[start[0], start[1]] = 0
@@ -90,37 +98,37 @@ class CheckersBoard():
         if (player == 1 and end[0] == 0) or (player == -1 and end[0] == 7):
             players_kings[end[0], end[1]] = 1
         self.moves_without_capture += 1
+        self.p1_valid_moves_updated = False
+        self.p2_valid_moves_updated = False
         return True
 
     def get_valid_moves_from_pos(self, player, pos):
         valid_moves = []
-        row_offset = -(player)
-        player_positions = self.get_player_positions(player)
+        row_offset = -player
         players_kings = self.get_players_kings(player)
-        if player_positions[pos[0], pos[1]] == 1:
-            x = pos[0] + row_offset
+        x = pos[0] + row_offset
+        y = pos[1] - 1
+        if self.is_valid_move(player, pos, [x, y]):
+            new_move = CheckersBoard(board=self)
+            new_move.execute_move(player, pos, [x, y])
+            valid_moves.append(new_move)
+        y = pos[1] + 1
+        if self.is_valid_move(player, pos, [x, y]):
+            new_move = CheckersBoard(board=self)
+            new_move.execute_move(player, pos, [x, y])
+            valid_moves.append(new_move)
+        if players_kings[pos[0], pos[1]] == 1:
+            x = pos[0] - row_offset
             y = pos[1] - 1
-            if self.is_empty_position(x, y):
+            if self.is_valid_move(player, pos, [x, y]):
                 new_move = CheckersBoard(board=self)
-                if new_move.execute_move(player, pos, [x, y]):
-                    valid_moves.append(new_move)
+                new_move.execute_move(player, pos, [x, y])
+                valid_moves.append(new_move)
             y = pos[1] + 1
-            if self.is_empty_position(x, y):
+            if self.is_valid_move(player, pos, [x, y]):
                 new_move = CheckersBoard(board=self)
-                if new_move.execute_move(player, pos, [x, y]):
-                    valid_moves.append(new_move)
-            if players_kings[pos[0], pos[1]] == 1:
-                x = pos[0] - row_offset
-                y = pos[1] - 1
-                if self.is_empty_position(x, y):
-                    new_move = CheckersBoard(board=self)
-                    if new_move.execute_move(player, pos, [x, y]):
-                        valid_moves.append(new_move)
-                y = pos[1] + 1
-                if self.is_empty_position(x, y):
-                    new_move = CheckersBoard(board=self)
-                    if new_move.execute_move(player, pos, [x, y]):
-                        valid_moves.append(new_move)
+                new_move.execute_move(player, pos, [x, y])
+                valid_moves.append(new_move)
         return valid_moves
 
     def execute_jump(self, player, start, end):
@@ -141,20 +149,22 @@ class CheckersBoard():
         if (player == 1 and end[0] == 0) or (player == -1 and end[0] == 7):
             players_kings[end[0], end[1]] = 1
         self.moves_without_capture = 0
+        self.p1_valid_moves_updated = False
+        self.p2_valid_moves_updated = False
         return True
 
     def is_valid_jump(self, player, start, end):
-        if abs(start[0] - end[0]) != 2 or abs(start[1] - end[1]) != 2:
-            return False
+        # if abs(start[0] - end[0]) != 2 or abs(start[1] - end[1]) != 2:
+            # return False
         if not self.is_empty_position(end[0], end[1]):
             return False
-        player_positions = self.get_player_positions(player)
-        players_kings = self.get_players_kings(player)
+        # player_positions = self.get_player_positions(player)
         opponent_positions = self.get_player_positions(-player)
         x1 = int(start[0] + ((end[0] - start[0]) / 2))
         y1 = int(start[1] + ((end[1] - start[1]) / 2))
-        if player_positions[start[0], start[1]] != 1 or opponent_positions[x1, y1] != 1:
+        if opponent_positions[x1, y1] != 1:
             return False
+        players_kings = self.get_players_kings(player)
         if players_kings[start[0], start[1]] == 0 and start[0] - x1 != player:
             return False
         return True
@@ -196,11 +206,20 @@ class CheckersBoard():
         return jumps
 
     def get_valid_moves(self, player):
+        if player == 1 and self.p1_valid_moves_updated is False:
+            self.update_valid_moves(player)
+        elif player == -1 and self.p2_valid_moves_updated is False:
+            self.update_valid_moves(player)
+        if player == 1:
+            return self.p1_valid_moves
+        elif player == -1:
+            return self.p2_valid_moves
+        return None
+
+    def update_valid_moves(self, player):
         valid_moves = []
         jumps = []
         player_positions = self.get_player_positions(player)
-        players_kings = self.get_players_kings(player)
-        opponent_positions = self.get_player_positions(-(player))
         for row in range(player_positions.shape[0]):
             for column in range(player_positions.shape[1]):
                 if player_positions[row, column] == 1:
@@ -211,9 +230,59 @@ class CheckersBoard():
                     if len(new_jumps) > 0:
                         jumps = np.hstack((jumps, new_jumps))
         if len(jumps) > 0:
-            return jumps
+            if player == 1:
+                self.p1_valid_moves = jumps
+            elif player == -1:
+                self.p2_valid_moves = jumps
         else:
-            return valid_moves
+            if player == 1:
+                self.p1_valid_moves = valid_moves
+                self.p1_valid_moves_updated = True
+            elif player == -1:
+                self.p2_valid_moves = valid_moves
+                self.p1_valid_moves_updated = True
+
+    def can_jump(self, player, pos):
+        if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] + 2]):
+            return True
+        if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] - 2]):
+            return True
+        if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] + 2]):
+            return True
+        if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] - 2]):
+            return True
+        return False
+
+    def has_valid_moves_from_pos(self, player, pos):
+        row_offset = -player
+        x = pos[0] + row_offset
+        y = pos[1] - 1
+        if self.is_valid_move(player, pos, [x, y]):
+            return True
+        y = pos[1] + 1
+        if self.is_valid_move(player, pos, [x, y]):
+            return True
+        players_kings = self.get_players_kings(player)
+        if players_kings[pos[0], pos[1]] == 1:
+            x = pos[0] - row_offset
+            y = pos[1] - 1
+            if self.is_valid_move(player, pos, [x, y]):
+                return True
+            y = pos[1] + 1
+            if self.is_valid_move(player, pos, [x, y]):
+                return True
+        return False
+
+    def has_valid_moves(self, player):
+        player_positions = self.get_player_positions(player)
+        for row in range(player_positions.shape[0]):
+            for column in range(player_positions.shape[1]):
+                if player_positions[row, column] == 1:
+                    if self.has_valid_moves_from_pos(player, [row, column]):
+                        return True
+                    if self.can_jump(player, [row, column]):
+                        return True
+        return False
 
     def game_ended(self):
         p1_pieces = 0
@@ -226,9 +295,9 @@ class CheckersBoard():
             p2_pieces += p
         if p2_pieces == 0:
             return True, 1
-        if len(self.get_valid_moves(1)) == 0:
+        if not self.has_valid_moves(1):
             return True, -1
-        if len(self.get_valid_moves(-1)) == 0:
+        if not self.has_valid_moves(-1):
             return True, 1
         if self.moves_without_capture >= 50:
             return True, 0

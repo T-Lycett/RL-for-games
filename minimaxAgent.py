@@ -33,7 +33,6 @@ class MinimaxAgent:
         else:
             return actions[np.argmin(scores)], np.min(scores)
 
-
     def evaluate(self, board):
         has_ended, winner = board.game_ended()
         if has_ended:

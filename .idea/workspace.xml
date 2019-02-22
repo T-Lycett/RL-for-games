@@ -2,7 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="d3cb5326-d5e0-4bad-a012-fe46e8365323" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/checkers.py" beforeDir="false" afterPath="$PROJECT_DIR$/checkers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/checkersBoard.py" beforeDir="false" afterPath="$PROJECT_DIR$/checkersBoard.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/minimaxAgent.py" beforeDir="false" afterPath="$PROJECT_DIR$/minimaxAgent.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -15,8 +18,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/checkersBoard.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="470">
-              <caret line="219" column="37" selection-start-line="219" selection-start-column="35" selection-end-line="219" selection-end-column="37" />
+            <state relative-caret-position="357">
+              <caret line="266" column="35" lean-forward="true" selection-start-line="266" selection-start-column="35" selection-end-line="266" selection-end-column="35" />
             </state>
           </provider>
         </entry>
@@ -24,8 +27,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/checkers.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="456">
-              <caret line="47" lean-forward="true" selection-start-line="47" selection-end-line="47" />
+            <state relative-caret-position="119">
+              <caret line="7" column="14" selection-start-line="7" selection-start-column="14" selection-end-line="7" selection-end-column="14" />
               <folding>
                 <element signature="e#0#29#0" expanded="true" />
               </folding>
@@ -36,8 +39,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/minimaxAgent.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="68">
-              <caret line="4" column="40" selection-start-line="4" selection-start-column="40" selection-end-line="4" selection-end-column="40" />
+            <state relative-caret-position="170">
+              <caret line="34" selection-start-line="34" selection-end-line="34" />
               <folding>
                 <element signature="e#0#20#0" expanded="true" />
               </folding>
@@ -71,8 +74,8 @@
       <list>
         <option value="$PROJECT_DIR$/games/checkersBoard.py" />
         <option value="$PROJECT_DIR$/games/checkers.py" />
-        <option value="$PROJECT_DIR$/checkersBoard.py" />
         <option value="$PROJECT_DIR$/minimaxAgent.py" />
+        <option value="$PROJECT_DIR$/checkersBoard.py" />
         <option value="$PROJECT_DIR$/checkers.py" />
       </list>
     </option>
@@ -191,7 +194,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/checkersBoard.py</url>
-          <line>233</line>
+          <line>302</line>
           <option name="timeStamp" value="23" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -256,27 +259,27 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/checkersBoard.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="470">
-          <caret line="219" column="37" selection-start-line="219" selection-start-column="35" selection-end-line="219" selection-end-column="37" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/minimaxAgent.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="68">
-          <caret line="4" column="40" selection-start-line="4" selection-start-column="40" selection-end-line="4" selection-end-column="40" />
+        <state relative-caret-position="170">
+          <caret line="34" selection-start-line="34" selection-end-line="34" />
           <folding>
             <element signature="e#0#20#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/checkersBoard.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="357">
+          <caret line="266" column="35" lean-forward="true" selection-start-line="266" selection-start-column="35" selection-end-line="266" selection-end-column="35" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/checkers.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="456">
-          <caret line="47" lean-forward="true" selection-start-line="47" selection-end-line="47" />
+        <state relative-caret-position="119">
+          <caret line="7" column="14" selection-start-line="7" selection-start-column="14" selection-end-line="7" selection-end-column="14" />
           <folding>
             <element signature="e#0#29#0" expanded="true" />
           </folding>
