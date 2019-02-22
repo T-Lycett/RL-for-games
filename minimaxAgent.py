@@ -2,9 +2,19 @@ import checkersBoard
 import numpy as np
 
 class MinimaxAgent:
-    def __init__(self, player, max_depth = 5):
+    def __init__(self, player, max_depth=5):
         self.player = player #1 = player1, -1 = player 2
         self.max_depth = max_depth
+
+    def get_move(self, board):
+        moves = board.get_valid_moves(self.player)
+        num_moves = len(moves)
+        if num_moves == 0:
+            return None, None
+        if num_moves == 1:
+            return moves[0], self.evaluate(moves[0])
+        else:
+            return self.minimax(board, 0)
 
     def minimax(self, board, current_depth=0):
         game_ended, _ = board.game_ended()
