@@ -5,6 +5,12 @@ class MinimaxAgent:
     def __init__(self, player, max_depth=5):
         self.player = player #1 = player1, -1 = player 2
         self.max_depth = max_depth
+        if self.player == 1:
+            self.home_row = 7
+            self.promotion_row = 0
+        elif self.player == -1:
+            self.home_row = 0
+            self.promotion_row = 7
 
     def get_move(self, board):
         moves = board.get_valid_moves(self.player)
@@ -38,10 +44,25 @@ class MinimaxAgent:
         if has_ended:
             return 100 * self.player * winner
 
+        players_pieces = board.get_players_pieces(self.player)
+        opp_pieces = board.get_players_pieces(-self.player)
+
         score = 0
-        for _, king in board.get_players_pieces(self.player).items():
-            score += 1 + (0.5 * king)
-        for _, king in board.get_players_pieces(-self.player).items():
-            score -= 1 + (0.5 * king)
+        dist_score = 0
+        for pos, king in players_pieces.items():
+            score += 1 + (0.75 * king) + (abs(self.home_row - pos[0]) * 0.1 * (1 - king))
+            if king == 1:
+                for opp_pos, _ in board.get_players_pieces(-self.player).items():
+                    dist_score += self.manhatten_dist(pos, opp_pos) * 0.01
+        if len(players_pieces) >= len(opp_pieces):
+            score -= dist_score / ((len(players_pieces)) * len(opp_pieces))
+        else:
+            score += dist_score / ((len(players_pieces)) * len(opp_pieces))
+
+        for pos, king in opp_pieces.items():
+            score -= 1 + (0.75 * king) + (abs(self.promotion_row - pos[0]) * 0.1)
 
         return score
+
+    def manhatten_dist(self, start, end):
+        return abs(start[0] - end[0]) + abs(start[1] - end[1])

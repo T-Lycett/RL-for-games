@@ -5,13 +5,14 @@ import time
 import cProfile, pstats, io
 from pstats import SortKey
 
-profile = True
+profile = False
 if profile:
     pr =cProfile.Profile()
     pr.enable()
 
 b = board.CheckersBoard(True);
 minimax_agent = minimaxAgent.MinimaxAgent(1, 5)
+minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 6)
 done = False
 start = time.time()
 while not done:
@@ -21,18 +22,21 @@ while not done:
     p1_move, val = minimax_agent.get_move(b)
     b.set_positions(p1_move)
     print('p1 move')
-    print(b.p1_positions - b.p2_positions)
+    print(b.p1_positions + b.p1_kings - b.p2_positions - b.p2_kings)
     print(val)
     # time.sleep(1)
     done, _ = b.game_ended()
     if not done:
-        p2_moves = b.get_valid_moves(-1)
-        print('p2 valid moves')
+        # p2_moves = b.get_valid_moves(-1)
+        # print('p2 valid moves')
         # for m in p2_moves:
         # #print(m.p2_positions)
-        b.set_positions(random.choice(p2_moves))
+        p2_move, val = minimax_agent2.get_move(b)
+        b.set_positions(p2_move)
+        # b.set_positions(random.choice(p2_moves))
         print('p2 move')
-        print(b.p1_positions - b.p2_positions)
+        print(b.p1_positions + b.p1_kings - b.p2_positions - b.p2_kings)
+        print(val)
         done, _ = b.game_ended()
     # time.sleep(1)
     print(time.time() - start)
