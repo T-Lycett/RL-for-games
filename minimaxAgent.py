@@ -1,4 +1,4 @@
-import checkersBoard
+import math
 import numpy as np
 
 class MinimaxAgent:
@@ -22,7 +22,7 @@ class MinimaxAgent:
         else:
             return self.minimax(board, 0)
 
-    def minimax(self, board, current_depth=0):
+    def minimax(self, board, current_depth=0, alpha=-math.inf, beta=math.inf):
         game_ended, _ = board.game_ended()
         if current_depth >= self.max_depth or game_ended:
             return board, self.evaluate(board)
@@ -31,18 +31,35 @@ class MinimaxAgent:
         else:
             current_player = -self.player
         actions = board.get_valid_moves(current_player)
-        scores = np.ndarray([len(actions)])
-        for i, a in enumerate(actions):
-            _, scores[i] = self.minimax(a, current_depth + 1)
         if current_player == self.player:
-            return actions[np.argmax(scores)], np.max(scores)
+            best_score = -math.inf
+            best_action_index = -1
+            for i, a in enumerate(actions):
+                _, score = self.minimax(a, current_depth + 1, alpha, beta)
+                if score > best_score:
+                    best_score = score
+                    best_action_index = i
+                    alpha = best_score
+                if alpha >= beta:
+                    break
+            return actions[best_action_index], best_score
         else:
-            return actions[np.argmin(scores)], np.min(scores)
+            best_score = math.inf
+            best_action_index = -1
+            for i, a in enumerate(actions):
+                _, score = self.minimax(a, current_depth + 1, alpha, beta)
+                if score < best_score:
+                    best_score = score
+                    best_action_index = i
+                    beta = best_score
+                if alpha >= beta:
+                    break
+            return actions[best_action_index], best_score
 
     def evaluate(self, board):
         has_ended, winner = board.game_ended()
         if has_ended:
-            return 100 * self.player * winner
+            return (100 * self.player * winner) - 2
 
         players_pieces = board.get_players_pieces(self.player)
         opp_pieces = board.get_players_pieces(-self.player)
@@ -56,11 +73,15 @@ class MinimaxAgent:
                     dist_score += self.manhatten_dist(pos, opp_pos) * 0.01
         if len(players_pieces) >= len(opp_pieces):
             score -= dist_score / ((len(players_pieces)) * len(opp_pieces))
+            opp_piece_val = 1.1
+            score -= board.moves_without_capture * 0.01
         else:
             score += dist_score / ((len(players_pieces)) * len(opp_pieces))
+            opp_piece_val = 1.0
 
         for pos, king in opp_pieces.items():
-            score -= 1 + (0.75 * king) + (abs(self.promotion_row - pos[0]) * 0.1)
+            score -= opp_piece_val + (0.75 * king) + (abs(self.promotion_row - pos[0]) * 0.1 * (1 - king))
+
 
         return score
 
