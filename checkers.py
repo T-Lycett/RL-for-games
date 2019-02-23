@@ -13,8 +13,8 @@ if profile:
 b = board.CheckersBoard(True);
 minimax_agent = minimaxAgent.MinimaxAgent(1, 5)
 done = False
+start = time.time()
 while not done:
-    start = time.time()
     # for m in p1_moves:
     # print(m.p1_positions)
     # b.set_positions(random.choice(p1_moves))
@@ -36,7 +36,7 @@ while not done:
         done, _ = b.game_ended()
     # time.sleep(1)
     print(time.time() - start)
-    done = True
+    # done = True
 if profile:
     # profiling code from: https://docs.python.org/3/library/profile.html#module-profile
     pr.disable()

@@ -19,6 +19,8 @@ class CheckersBoard():
         self.p2_valid_moves = []
         self.p1_valid_moves_updated = False
         self.p2_valid_moves_updated = False
+        self.p1_pieces = {}
+        self.p2_pieces = {}
 
     def set_start_positions(self):
         self.reset()
@@ -31,6 +33,14 @@ class CheckersBoard():
         self.p2_positions[1, ::2] = 1
         self.p2_positions[2, :] = 1
         self.p2_positions[2, ::2] = 0
+        for x in range(0, 8, 2):
+            self.p1_pieces[(7, x)] = 0
+            self.p1_pieces[(5, x)] = 0
+            self.p2_pieces[(1, x)] = 0
+        for x in range(1, 8, 2):
+            self.p1_pieces[(6, x)] = 0
+            self.p2_pieces[(0, x)] = 0
+            self.p2_pieces[(2, x)] = 0
         self.update_valid_moves(1)
         self.update_valid_moves(-1)
 
@@ -41,6 +51,8 @@ class CheckersBoard():
         self.p2_kings = board.p2_kings.copy()
         self.p1_valid_moves = board.p1_valid_moves.copy()
         self.p2_valid_moves = board.p2_valid_moves.copy()
+        self.p1_pieces = board.p1_pieces.copy()
+        self.p2_pieces = board.p2_pieces.copy()
         self.moves_without_capture = board.moves_without_capture
         self.p1_valid_moves_updated = board.p1_valid_moves_updated
         self.p2_valid_moves_updated = board.p2_valid_moves_updated
@@ -70,12 +82,18 @@ class CheckersBoard():
             return self.p2_kings
         return None
 
+    def get_players_pieces(self, player):
+        if player == 1:
+            return self.p1_pieces
+        elif player == -1:
+            return self.p2_pieces
+        return None
+
     def is_valid_move(self, player, start, end):
         if not self.is_empty_position(end[0], end[1]) or not self.is_valid_position(start[0], start[1]):
             return False
         player_positions = self.get_player_positions(player)
         player_kings = self.get_players_kings(player)
-        opponent_positions = self.get_player_positions(-player)
         if player_positions[start[0], start[1]] == 0: #if no token at start
             return False
         if player_kings[start[0], start[1]] == 0:
@@ -91,8 +109,11 @@ class CheckersBoard():
     def execute_move(self, player, start, end):
         players_positions = self.get_player_positions(player)
         players_kings = self.get_players_kings(player)
+        players_pieces = self.get_players_pieces(player)
         players_positions[start[0], start[1]] = 0
         players_positions[end[0], end[1]] = 1
+        del players_pieces[(start[0], start[1])]
+        players_pieces[(end[0], end[1])] = players_kings[start[0], start[1]]
         players_kings[end[0], end[1]] = players_kings[start[0], start[1]]
         players_kings[start[0], start[1]] = 0
         if (player == 1 and end[0] == 0) or (player == -1 and end[0] == 7):
@@ -136,16 +157,21 @@ class CheckersBoard():
             return False
         player_positions = self.get_player_positions(player)
         players_kings = self.get_players_kings(player)
+        player_pieces = self.get_players_pieces(player)
         opponent_positions = self.get_player_positions(-player)
         opponent_kings = self.get_players_kings(-player)
+        opponent_pieces = self.get_players_pieces(-player)
         x = int(start[0] + ((end[0] - start[0]) / 2))
         y = int(start[1] + ((end[1] - start[1]) / 2))
         player_positions[start[0], start[1]] = 0
         player_positions[end[0], end[1]] = 1
+        del player_pieces[(start[0], start[1])]
+        player_pieces[(end[0], end[1])] = players_kings[start[0], start[1]]
         players_kings[end[0], end[1]] = players_kings[start[0], start[1]]
         players_kings[start[0], start[1]] = 0
         opponent_positions[x, y] = 0
         opponent_kings[x, y] = 0
+        del opponent_pieces[(x, y)]
         if (player == 1 and end[0] == 0) or (player == -1 and end[0] == 7):
             players_kings[end[0], end[1]] = 1
         self.moves_without_capture = 0
@@ -219,16 +245,14 @@ class CheckersBoard():
     def update_valid_moves(self, player):
         valid_moves = []
         jumps = []
-        player_positions = self.get_player_positions(player)
-        for row in range(player_positions.shape[0]):
-            for column in range(player_positions.shape[1]):
-                if player_positions[row, column] == 1:
-                    new_moves = self.get_valid_moves_from_pos(player, [row, column])
-                    new_jumps = self.get_jumps(player, [row, column])
-                    if len(new_moves) > 0:
-                        valid_moves = np.hstack((valid_moves, new_moves))
-                    if len(new_jumps) > 0:
-                        jumps = np.hstack((jumps, new_jumps))
+        player_pieces = self.get_players_pieces(player)
+        for (row, column), king in player_pieces.items():
+            new_moves = self.get_valid_moves_from_pos(player, [row, column])
+            new_jumps = self.get_jumps(player, [row, column])
+            if len(new_moves) > 0:
+                valid_moves = np.hstack((valid_moves, new_moves))
+            if len(new_jumps) > 0:
+                jumps = np.hstack((jumps, new_jumps))
         if len(jumps) > 0:
             if player == 1:
                 self.p1_valid_moves = jumps
@@ -274,14 +298,12 @@ class CheckersBoard():
         return False
 
     def has_valid_moves(self, player):
-        player_positions = self.get_player_positions(player)
-        for row in range(player_positions.shape[0]):
-            for column in range(player_positions.shape[1]):
-                if player_positions[row, column] == 1:
-                    if self.has_valid_moves_from_pos(player, [row, column]):
-                        return True
-                    if self.can_jump(player, [row, column]):
-                        return True
+        player_pieces = self.get_players_pieces(player)
+        for pos, king in player_pieces.items():
+            if self.has_valid_moves_from_pos(player, [pos[0], pos[1]]):
+                return True
+            if self.can_jump(player, [pos[0], pos[1]]):
+                return True
         return False
 
     def game_ended(self):

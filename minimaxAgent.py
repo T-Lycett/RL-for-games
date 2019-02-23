@@ -39,13 +39,9 @@ class MinimaxAgent:
             return 100 * self.player * winner
 
         score = 0
-        for n in board.get_player_positions(self.player).flat:
-            score += n
-        for n in board.get_player_positions(-self.player).flat:
-            score -= n
-        for k in board.get_players_kings(self.player).flat:
-            score += k * 0.5
-        for k in board.get_players_kings(-self.player).flat:
-            score -= k * 0.5
+        for _, king in board.get_players_pieces(self.player).items():
+            score += 1 + (0.5 * king)
+        for _, king in board.get_players_pieces(-self.player).items():
+            score -= 1 + (0.5 * king)
 
         return score
