@@ -18,14 +18,14 @@ class MinimaxAgent:
         if num_moves == 0:
             return None, None
         if num_moves == 1:
-            return moves[0], self.evaluate(moves[0])
+            return moves[0], self.evaluate(moves[0], 1)
         else:
             return self.minimax(board, 0)
 
     def minimax(self, board, current_depth=0, alpha=-math.inf, beta=math.inf):
         game_ended, _ = board.game_ended()
         if current_depth >= self.max_depth or game_ended:
-            return board, self.evaluate(board)
+            return board, self.evaluate(board, current_depth + 1)
         if current_depth % 2 == 0:
             current_player = self.player
         else:
@@ -56,28 +56,44 @@ class MinimaxAgent:
                     break
             return actions[best_action_index], best_score
 
-    def evaluate(self, board):
+    def evaluate(self, board, num_moves):
         has_ended, winner = board.game_ended()
         if has_ended:
-            return (100 * self.player * winner) - 2
+            if winner == 0:
+                return -2
+            elif winner == self.player:
+                return 100 - num_moves
+            else:
+                return -100 + num_moves
 
         players_pieces = board.get_players_pieces(self.player)
         opp_pieces = board.get_players_pieces(-self.player)
 
         score = 0
-        dist_score = 0
+        max_dist = 0
+        min_dist = 0
         for pos, king in players_pieces.items():
             score += 1 + (0.75 * king) + (abs(self.home_row - pos[0]) * 0.1 * (1 - king))
             if king == 1:
+                total_dist = 0
                 for opp_pos, _ in board.get_players_pieces(-self.player).items():
-                    dist_score += self.manhatten_dist(pos, opp_pos) * 0.01
-        if len(players_pieces) >= len(opp_pieces):
-            score -= dist_score / ((len(players_pieces)) * len(opp_pieces))
+                    total_dist += self.manhatten_dist(pos, opp_pos) * 0.05
+                mean_dist = total_dist / len(opp_pieces)
+                max_dist = max(max_dist, mean_dist)
+                min_dist = min(min_dist, mean_dist)
+        num_pieces = len(players_pieces)
+        num_opp_peices = len(opp_pieces)
+        if num_pieces > num_opp_peices:
+            score -= max_dist
             opp_piece_val = 1.1
             score -= board.moves_without_capture * 0.01
-        else:
-            score += dist_score / ((len(players_pieces)) * len(opp_pieces))
+        elif num_pieces == num_opp_peices:
+            score -= max_dist
             opp_piece_val = 1.0
+            score -= board.moves_without_capture * 0.01
+        else:
+            score += min_dist
+            opp_piece_val = 0.9
 
         for pos, king in opp_pieces.items():
             score -= opp_piece_val + (0.75 * king) + (abs(self.promotion_row - pos[0]) * 0.1 * (1 - king))
