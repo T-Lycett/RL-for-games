@@ -6,11 +6,11 @@ class MinimaxAgent:
         self.player = player #1 = player1, -1 = player 2
         self.max_depth = max_depth
         if self.player == 1:
-            self.home_row = 7
-            self.promotion_row = 0
+            self.kings_row = 7
+            self.opponent_kings_row = 0
         elif self.player == -1:
-            self.home_row = 0
-            self.promotion_row = 7
+            self.kings_row = 0
+            self.opponent_kings_row = 7
 
     def get_move(self, board):
         moves = board.get_valid_moves(self.player)
@@ -73,7 +73,7 @@ class MinimaxAgent:
         max_dist = 0
         min_dist = 0
         for pos, king in players_pieces.items():
-            score += 1 + (0.75 * king) + (abs(self.home_row - pos[0]) * 0.1 * (1 - king))
+            score += 1 + (0.75 * king) + (abs(self.kings_row - pos[0]) * 0.1 * (1 - king))
             if king == 1:
                 total_dist = 0
                 for opp_pos, _ in board.get_players_pieces(-self.player).items():
@@ -96,7 +96,7 @@ class MinimaxAgent:
             opp_piece_val = 0.9
 
         for pos, king in opp_pieces.items():
-            score -= opp_piece_val + (0.75 * king) + (abs(self.promotion_row - pos[0]) * 0.1 * (1 - king))
+            score -= opp_piece_val + (0.75 * king) + (abs(self.opponent_kings_row - pos[0]) * 0.1 * (1 - king))
 
 
         return score
