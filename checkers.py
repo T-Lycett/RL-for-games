@@ -11,7 +11,7 @@ if profile:
     pr.enable()
 
 b = board.CheckersBoard(True);
-minimax_agent = minimaxAgent.MinimaxAgent(1, 6)
+minimax_agent = minimaxAgent.MinimaxAgent(1, 3)
 minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
 done = False
 start = time.time()

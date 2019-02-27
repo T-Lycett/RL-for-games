@@ -72,22 +72,22 @@ class MinimaxAgent:
         score = 0
         max_dist = 0
         min_dist = 0
+        num_pieces = len(players_pieces)
+        num_opp_pieces = len(opp_pieces)
         for pos, king in players_pieces.items():
             score += 1 + (0.75 * king) + (abs(self.kings_row - pos[0]) * 0.1 * (1 - king))
             if king == 1:
                 total_dist = 0
                 for opp_pos, _ in board.get_players_pieces(-self.player).items():
                     total_dist += self.manhatten_dist(pos, opp_pos) * 0.05
-                mean_dist = total_dist / len(opp_pieces)
+                mean_dist = total_dist / num_opp_pieces
                 max_dist = max(max_dist, mean_dist)
                 min_dist = min(min_dist, mean_dist)
-        num_pieces = len(players_pieces)
-        num_opp_peices = len(opp_pieces)
-        if num_pieces > num_opp_peices:
+        if num_pieces > num_opp_pieces:
             score -= max_dist
             opp_piece_val = 1.1
             score -= board.moves_without_capture * 0.01
-        elif num_pieces == num_opp_peices:
+        elif num_pieces == num_opp_pieces:
             score -= max_dist
             opp_piece_val = 1.0
             score -= board.moves_without_capture * 0.01
@@ -97,7 +97,6 @@ class MinimaxAgent:
 
         for pos, king in opp_pieces.items():
             score -= opp_piece_val + (0.75 * king) + (abs(self.opponent_kings_row - pos[0]) * 0.1 * (1 - king))
-
 
         return score
 
