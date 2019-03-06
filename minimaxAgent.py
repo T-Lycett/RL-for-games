@@ -1,9 +1,10 @@
 import math
 import numpy as np
+from random import shuffle
 
 class MinimaxAgent:
     def __init__(self, player, max_depth=5):
-        self.player = player #1 = player1, -1 = player 2
+        self.player = player  # 1 = player1, -1 = player 2
         self.max_depth = max_depth
         if self.player == 1:
             self.kings_row = 7
@@ -23,14 +24,15 @@ class MinimaxAgent:
             return self.minimax(board, 0)
 
     def minimax(self, board, current_depth=0, alpha=-math.inf, beta=math.inf):
-        game_ended, _ = board.game_ended()
-        if current_depth >= self.max_depth or game_ended:
-            return board, self.evaluate(board, current_depth + 1)
         if current_depth % 2 == 0:
             current_player = self.player
         else:
             current_player = -self.player
+        game_ended, _ = board.game_ended()
+        if current_depth >= self.max_depth or game_ended:
+            return board, self.evaluate(board, current_depth + 1)
         actions = board.get_valid_moves(current_player)
+        shuffle(actions)
         if current_player == self.player:
             best_score = -math.inf
             best_action_index = -1

@@ -2,6 +2,9 @@ import numpy as np
 
 
 class CheckersBoard():
+    board_height = 8
+    board_width = 8
+
     def __init__(self, start_positions = False, board = None):
         self.reset()
         if start_positions:
@@ -10,10 +13,10 @@ class CheckersBoard():
             self.set_positions(board)
 
     def reset(self):
-        self.p1_positions = np.zeros((8, 8))
-        self.p2_positions = np.zeros((8, 8))
-        self.p1_kings = np.zeros((8, 8))
-        self.p2_kings = np.zeros((8, 8))
+        self.p1_positions = np.zeros((CheckersBoard.board_height, CheckersBoard.board_width))
+        self.p2_positions = np.zeros((CheckersBoard.board_height, CheckersBoard.board_width))
+        self.p1_kings = np.zeros((CheckersBoard.board_height, CheckersBoard.board_width))
+        self.p2_kings = np.zeros((CheckersBoard.board_height, CheckersBoard.board_width))
         self.moves_without_capture = 0
         self.p1_valid_moves = []
         self.p2_valid_moves = []
@@ -33,11 +36,11 @@ class CheckersBoard():
         self.p2_positions[1, ::2] = 1
         self.p2_positions[2, :] = 1
         self.p2_positions[2, ::2] = 0
-        for x in range(0, 8, 2):
+        for x in range(0, CheckersBoard.board_width, 2):
             self.p1_pieces[(7, x)] = 0
             self.p1_pieces[(5, x)] = 0
             self.p2_pieces[(1, x)] = 0
-        for x in range(1, 8, 2):
+        for x in range(1, CheckersBoard.board_width, 2):
             self.p1_pieces[(6, x)] = 0
             self.p2_pieces[(0, x)] = 0
             self.p2_pieces[(2, x)] = 0
@@ -58,7 +61,7 @@ class CheckersBoard():
         self.p2_valid_moves_updated = board.p2_valid_moves_updated
 
     def is_valid_position(self, row, column):
-        if row >= 0 and row <= 7 and column >= 0 and column <= 7:
+        if row >= 0 and row < CheckersBoard.board_height and column >= 0 and column < CheckersBoard.board_width:
             return True
         return False
 

@@ -1,0 +1,2 @@
+model_checkpoint_path: "res_nn_Model"
+all_model_checkpoint_paths: "res_nn_Model"
