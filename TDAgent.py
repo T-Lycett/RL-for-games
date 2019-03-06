@@ -104,7 +104,7 @@ class TDAgent():
 
     def self_play(self, num_games=1000, iterations=1, lambda_val=0.9, batch_size=2048, noise=0.0):
         games = 0
-        e = 0.1
+        e = 0.05
         for iteration in range(iterations):
             print('iteration: ' + str(iteration))
             for g in range(num_games):
@@ -117,7 +117,7 @@ class TDAgent():
                 move_history.append([state, False, None])
                 num_moves = 0
                 while not game_ended:
-                    if num_moves < 2 or np.random.rand(1) <= e:
+                    if np.random.rand(1) <= e:
                         move = random.choice(board.get_valid_moves(current_player))
                     else:
                         move, _ = self.get_move(board, current_player, 1, noise=noise)
