@@ -10,6 +10,7 @@ import resNN
 import multiprocessing
 import threading
 import time
+import mcts
 
 board_height = checkersBoard.CheckersBoard.board_height
 board_width = checkersBoard.CheckersBoard.board_width
@@ -81,7 +82,7 @@ def extract_features(board, current_player):
     return np.array([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw])
 
 
-def get_move(model, board, player, search_depth, noise=0.0):
+def get_move(model, board, player, mcts_instance, temperature):
     moves = board.get_valid_moves(player)
     num_moves = len(moves)
     if num_moves == 0:
@@ -89,7 +90,8 @@ def get_move(model, board, player, search_depth, noise=0.0):
     if num_moves == 1:
         return moves[0], evaluate(model, moves[0], player)
     else:
-        return minimax(model, board, player, search_depth, noise=noise)
+        probs = mcts_instance.get_probabilities(board, player, temperature=temperature)
+        return np.random.choice(moves, p=probs), None
 
 
 def self_play_game_player(model_filename, num_games=1000, noise=0.0):
@@ -98,9 +100,9 @@ def self_play_game_player(model_filename, num_games=1000, noise=0.0):
     sess = tf.Session(config=config)
     keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
     model = keras.models.load_model(model_filename)
+    mcts_instance = mcts.MCTS(model)
     training_examples = []
     games = 0
-    e = 0.01
     for g in range(num_games):
         games += 1
         move_history = []
@@ -110,11 +112,12 @@ def self_play_game_player(model_filename, num_games=1000, noise=0.0):
         state = extract_features(board, current_player)
         move_history.append([state, False, None])
         num_moves = 0
+        moves_until_t0 = 40
         while not game_ended:
-            if np.random.rand(1) <= e or num_moves < 1:
-                move = random.choice(board.get_valid_moves(current_player))
+            if num_moves < moves_until_t0:
+                move, _ = get_move(model, board, current_player, mcts_instance, 0.5)
             else:
-                move, _ = get_move(model, board, current_player, 1, noise=noise)
+                move, _ = get_move(model, board, current_player, mcts_instance, 0)
             board.set_positions(move)
             state = extract_features(board, current_player)
             game_ended, reward = board.game_ended()
@@ -175,7 +178,7 @@ class TDAgent():
         pieces = pieces[:, ::-1]
         return pieces
 
-    def get_move(self, board, player, search_depth, noise=0.0):
+    def get_move(self, board, player, mcts_instance):
         moves = board.get_valid_moves(player)
         num_moves = len(moves)
         if num_moves == 0:
@@ -183,7 +186,9 @@ class TDAgent():
         if num_moves == 1:
             return moves[0], self.evaluate(moves[0], player)
         else:
-            return self.minimax(board, player, search_depth, noise=noise)
+            probs = mcts_instance.get_probabilities(board, player, temperature=0)
+            move = np.random.choice(moves, p=probs)
+            return move, self.evaluate(move, player)
 
     def minimax(self, board, player, max_depth, current_depth=0, alpha=-math.inf, beta=math.inf, noise=0.0):
         if current_depth % 2 == 0:

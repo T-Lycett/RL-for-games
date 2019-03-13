@@ -8,6 +8,7 @@ from pstats import SortKey
 import matplotlib.pyplot as plt
 from multiprocessing import freeze_support
 import QLearner
+import mcts
 
 if __name__ == '__main__':
     freeze_support()
@@ -19,7 +20,7 @@ if __name__ == '__main__':
         pr =cProfile.Profile()
         pr.enable()
 
-    lr_schedule = {0: 0.00001}
+    lr_schedule = {0: 0.001}
     opponent_depth = 2
     minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
     TD_agent = TDAgent.TDAgent(model_file)
@@ -39,7 +40,7 @@ if __name__ == '__main__':
         if i in lr_schedule:
             TD_agent.set_lr(lr_schedule[i])
         print('iteration: ' + str(i))
-        TD_agent.self_play(num_games=1000)
+        TD_agent.self_play(num_games=100)
         TD_agent.save_model(model_file)
         # q_learner.learn(q_file, num_games=1000, iterations=20, opposition_depth=opponent_depth)
         # q_learner.save_q_values(q_file)
@@ -51,12 +52,13 @@ if __name__ == '__main__':
         for g in range(test_games):
             done = False
             minimax_agent = minimaxAgent.MinimaxAgent(-1, min(4, opponent_depth))
+            mcts_instance = mcts.MCTS(TD_agent.NN)
             b = board.CheckersBoard(True)
             while not done:
                 # for m in p1_moves:
                 # print(m.p1_positions)
                 # b.set_positions(random.choice(p1_moves))
-                p1_move, val = TD_agent.get_move(b, 1, 1, noise=0)
+                p1_move, val = TD_agent.get_move(b, 1, mcts_instance)
                 # p1_move, val = q_learner.get_move(b, 1)
                 b.set_positions(p1_move)
                 print('p1 move')
