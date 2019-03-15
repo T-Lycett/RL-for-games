@@ -90,7 +90,7 @@ def get_move(model, board, player, mcts_instance, temperature):
     if num_moves == 1:
         return moves[0], evaluate(model, moves[0], player)
     else:
-        probs = mcts_instance.get_probabilities(board, player, temperature=temperature)
+        probs = mcts_instance.get_probabilities(board, player, num_sims=100, temperature=temperature)
         return np.random.choice(moves, p=probs), None
 
 
@@ -186,7 +186,7 @@ class TDAgent():
         if num_moves == 1:
             return moves[0], self.evaluate(moves[0], player)
         else:
-            probs = mcts_instance.get_probabilities(board, player, temperature=0)
+            probs = mcts_instance.get_probabilities(board, player, num_sims=100, temperature=0)
             move = np.random.choice(moves, p=probs)
             return move, self.evaluate(move, player)
 
@@ -261,10 +261,14 @@ class TDAgent():
             self.training_examples = [r.get() for r in results]
             self.training_examples = [item for sublist in self.training_examples for item in sublist]
             print('training examples: ' + str(len(self.training_examples)))
+            config = tf.ConfigProto()
+            config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+            self.sess = tf.Session(config=config)
+            keras.backend.set_session(self.sess)  # set this TensorFlow session as the default session for Keras
+            self.NN = keras.models.load_model(self.model_filename)
             # self.pos_eval_worker.close()
-            while len(self.training_examples) >= batch_size:
-                self.update_model(self.training_examples[-batch_size:], lambda_val, batch_size)
-                self.training_examples[-batch_size:] = []
+            self.update_model(self.training_examples, lambda_val, len(self.training_examples))
+            self.training_examples = []
             self.save_model(self.model_filename)
 
     @staticmethod

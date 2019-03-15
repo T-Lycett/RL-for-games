@@ -29,7 +29,7 @@ if __name__ == '__main__':
     q_learner = QLearner.QLearner()
     start = time.time()
     iterations = 100
-    test_games = 30
+    test_games = 20
     wins = []
     draws = []
     losses = []
