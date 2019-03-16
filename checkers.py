@@ -12,14 +12,14 @@ import QLearner
 if __name__ == '__main__':
     freeze_support()
 
-    model_file = 'cnn128x3.h5'
+    model_file = 'res128x5.h5'
 
     profile = False
     if profile:
         pr =cProfile.Profile()
         pr.enable()
 
-    lr_schedule = {0: 0.00001}
+    lr_schedule = {0: 0.000001}
     opponent_depth = 2
     minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
     TD_agent = TDAgent.TDAgent(model_file)
@@ -50,7 +50,7 @@ if __name__ == '__main__':
         losses.append(0)
         for g in range(test_games):
             done = False
-            minimax_agent = minimaxAgent.MinimaxAgent(-1, min(4, opponent_depth))
+            minimax_agent = minimaxAgent.MinimaxAgent(-1, min(6, opponent_depth))
             b = board.CheckersBoard(True)
             while not done:
                 # for m in p1_moves:
@@ -81,14 +81,15 @@ if __name__ == '__main__':
         # plt.cla()
         plt.plot(i + 1, wins[i], 'g.', i + 1, draws[i], 'b.', i + 1, losses[i], 'r.')
         plt.pause(0.001)
-
-                # time.sleep(1)
+        # time.sleep(1)
         print('opponent depth: ' + str(opponent_depth))
         print('wins: ' + str(wins))
         print('draws: ' + str(draws))
         print('losses: ' + str(losses))
-        # if wins[int(i/1)] >= 8:
-            # opponent_depth += 1
+        if wins[int(i/1)] >= test_games and opponent_depth <= 6:
+            opponent_depth += 1
+            plt.plot([i + 1, i + 1], [test_games, 0], 'k-')
+            plt.pause(0.001)
         print((time.time() - start) / (i + 1))
     plt.show()
     if profile:

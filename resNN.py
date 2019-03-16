@@ -5,7 +5,7 @@ import checkersBoard
 
 
 class ResNN():
-    def __init__(self, lr=0.001, residual_blocks=2):
+    def __init__(self, lr=0.001, residual_blocks=5):
         conv2d = keras.layers.Conv2D
         self.dformat = 'channels_first'
         board_height = checkersBoard.CheckersBoard.board_height
@@ -56,6 +56,9 @@ class ResNN():
 
     def save_weights(self, filepath):
         self.model.save_weights(filepath)
+
+    def save_model(self, filepath):
+        self.model.save(filepath)
 
     def viewLayers(self):
         layers = self.model.layers

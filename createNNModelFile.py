@@ -1,10 +1,11 @@
 import cnn
+import resNN
 
 
 def create_model_file(filename):
-    model = cnn.CNN()
+    model = resNN.ResNN()
     model.save_model(filename)
 
 
 if __name__ == '__main__':
-    create_model_file('cnn128x3.h5')
+    create_model_file('res128x5.h5')
