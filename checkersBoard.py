@@ -1,9 +1,18 @@
 import numpy as np
+from enum import Enum
 
+
+class Direction(Enum):
+    UP_LEFT = 0
+    UP_RIGHT = 1
+    DOWN_LEFT = 2
+    DOWN_RIGHT = 3
 
 class CheckersBoard():
+
     board_height = 8
     board_width = 8
+    action_size = 128
 
     def __init__(self, start_positions = False, board = None):
         self.reset()
@@ -24,6 +33,8 @@ class CheckersBoard():
         self.p2_valid_moves_updated = False
         self.p1_pieces = {}
         self.p2_pieces = {}
+        self.p1_valids_list = np.zeros(CheckersBoard.action_size)
+        self.p2_valids_list = np.zeros(CheckersBoard.action_size)
 
     def set_start_positions(self):
         self.reset()
@@ -59,6 +70,8 @@ class CheckersBoard():
         self.moves_without_capture = board.moves_without_capture
         self.p1_valid_moves_updated = board.p1_valid_moves_updated
         self.p2_valid_moves_updated = board.p2_valid_moves_updated
+        self.p1_valids_list = board.p1_valids_list.copy()
+        self.p2_valids_list = board.p2_valids_list.copy()
 
     def is_valid_position(self, row, column):
         if row >= 0 and row < CheckersBoard.board_height and column >= 0 and column < CheckersBoard.board_width:
@@ -128,6 +141,7 @@ class CheckersBoard():
 
     def get_valid_moves_from_pos(self, player, pos):
         valid_moves = []
+        index_list = []
         row_offset = -player
         players_kings = self.get_players_kings(player)
         x = pos[0] + row_offset
@@ -136,11 +150,19 @@ class CheckersBoard():
             new_move = CheckersBoard(board=self)
             new_move.execute_move(player, pos, [x, y])
             valid_moves.append(new_move)
+            if row_offset == 1:
+                index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_LEFT.value)
+            else:
+                index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_LEFT.value)
         y = pos[1] + 1
         if self.is_valid_move(player, pos, [x, y]):
             new_move = CheckersBoard(board=self)
             new_move.execute_move(player, pos, [x, y])
             valid_moves.append(new_move)
+            if row_offset == 1:
+                index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_RIGHT.value)
+            else:
+                index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_RIGHT.value)
         if players_kings[pos[0], pos[1]] == 1:
             x = pos[0] - row_offset
             y = pos[1] - 1
@@ -148,12 +170,20 @@ class CheckersBoard():
                 new_move = CheckersBoard(board=self)
                 new_move.execute_move(player, pos, [x, y])
                 valid_moves.append(new_move)
+                if row_offset == 1:
+                    index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_LEFT.value)
+                else:
+                    index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_LEFT.value)
             y = pos[1] + 1
             if self.is_valid_move(player, pos, [x, y]):
                 new_move = CheckersBoard(board=self)
                 new_move.execute_move(player, pos, [x, y])
                 valid_moves.append(new_move)
-        return valid_moves
+                if row_offset == 1:
+                    index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_RIGHT.value)
+                else:
+                    index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_RIGHT.value)
+        return valid_moves, index_list
 
     def execute_jump(self, player, start, end):
         if not self.is_valid_jump(player, start, end):
@@ -200,7 +230,9 @@ class CheckersBoard():
 
     def get_jumps(self, player, pos):
         jumps = []
+        index_list = []
         if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] + 2]):
+            index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_RIGHT.value)
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] + 2, pos[1] + 2]):
                 chain_jumps = new_jump.get_jumps(player, [pos[0] + 2, pos[1] + 2])
@@ -209,6 +241,7 @@ class CheckersBoard():
                 else:
                     jumps = np.append(jumps, new_jump)
         if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] - 2]):
+            index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_LEFT.value)
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] + 2, pos[1] - 2]):
                 chain_jumps = new_jump.get_jumps(player, [pos[0] + 2, pos[1] - 2])
@@ -217,6 +250,7 @@ class CheckersBoard():
                 else:
                     jumps = np.append(jumps, new_jump)
         if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] + 2]):
+            index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_RIGHT.value)
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] - 2, pos[1] + 2]):
                 chain_jumps = new_jump.get_jumps(player, [pos[0] - 2, pos[1] + 2])
@@ -225,6 +259,7 @@ class CheckersBoard():
                 else:
                     jumps = np.append(jumps, new_jump)
         if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] - 2]):
+            index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_LEFT.value)
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] - 2, pos[1] - 2]):
                 chain_jumps = new_jump.get_jumps(player, [pos[0] - 2, pos[1] - 2])
@@ -232,7 +267,7 @@ class CheckersBoard():
                     jumps = np.hstack((jumps, chain_jumps))
                 else:
                     jumps = np.append(jumps, new_jump)
-        return jumps
+        return jumps, index_list
 
     def get_valid_moves(self, player):
         if player == 1 and self.p1_valid_moves_updated is False:
@@ -247,15 +282,22 @@ class CheckersBoard():
 
     def update_valid_moves(self, player):
         valid_moves = []
+        action_indices = []
         jumps = []
         player_pieces = self.get_players_pieces(player)
+        if player == 1:
+            self.p1_valids_list = np.zeros(CheckersBoard.action_size)
+        elif player == -1:
+            self.p2_valids_list = np.zeros(CheckersBoard.action_size)
         for (row, column), king in player_pieces.items():
-            new_moves = self.get_valid_moves_from_pos(player, [row, column])
-            new_jumps = self.get_jumps(player, [row, column])
+            new_moves, move_indices = self.get_valid_moves_from_pos(player, [row, column])
+            new_jumps, jump_indices = self.get_jumps(player, [row, column])
             if len(new_moves) > 0:
                 valid_moves = np.hstack((valid_moves, new_moves))
+                action_indices = np.hstack((action_indices, move_indices))
             if len(new_jumps) > 0:
                 jumps = np.hstack((jumps, new_jumps))
+                action_indices = np.hstack((action_indices, jump_indices))
         if len(jumps) > 0:
             if player == 1:
                 self.p1_valid_moves = jumps
@@ -268,6 +310,12 @@ class CheckersBoard():
             elif player == -1:
                 self.p2_valid_moves = valid_moves
                 self.p1_valid_moves_updated = True
+        if player == 1:
+            for i in action_indices:
+                self.p1_valids_list[int(i)] = 1
+        elif player == -1:
+            for i in action_indices:
+                self.p2_valids_list[int(i)] = 1
 
     def can_jump(self, player, pos):
         if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] + 2]):

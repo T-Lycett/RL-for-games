@@ -40,8 +40,8 @@ if __name__ == '__main__':
         if i in lr_schedule:
             TD_agent.set_lr(lr_schedule[i])
         print('iteration: ' + str(i))
-        TD_agent.self_play(num_games=100)
-        TD_agent.save_model(model_file)
+        # TD_agent.self_play(num_games=100)
+        # TD_agent.save_model(model_file)
         # q_learner.learn(q_file, num_games=1000, iterations=20, opposition_depth=opponent_depth)
         # q_learner.save_q_values(q_file)
         if i % 1 != 0:
