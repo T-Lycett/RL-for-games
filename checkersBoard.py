@@ -12,7 +12,7 @@ class CheckersBoard():
 
     board_height = 8
     board_width = 8
-    action_size = 128
+    action_size = 256
 
     def __init__(self, start_positions = False, board = None):
         self.reset()
@@ -29,12 +29,15 @@ class CheckersBoard():
         self.moves_without_capture = 0
         self.p1_valid_moves = []
         self.p2_valid_moves = []
+        self.p1_valid_moves_single_jumps = []
+        self.p2_valid_moves_single_jumps = []
         self.p1_valid_moves_updated = False
         self.p2_valid_moves_updated = False
         self.p1_pieces = {}
         self.p2_pieces = {}
-        self.p1_valids_list = np.zeros(CheckersBoard.action_size)
-        self.p2_valids_list = np.zeros(CheckersBoard.action_size)
+        self.current_player = 1
+        self.chain_jump = False
+        self.chain_jump_from = None
 
     def set_start_positions(self):
         self.reset()
@@ -55,6 +58,9 @@ class CheckersBoard():
             self.p1_pieces[(6, x)] = 0
             self.p2_pieces[(0, x)] = 0
             self.p2_pieces[(2, x)] = 0
+        self.current_player = 1
+        self.chain_jump = False
+        self.chain_jump_from = None
         self.update_valid_moves(1)
         self.update_valid_moves(-1)
 
@@ -65,13 +71,16 @@ class CheckersBoard():
         self.p2_kings = board.p2_kings.copy()
         self.p1_valid_moves = board.p1_valid_moves.copy()
         self.p2_valid_moves = board.p2_valid_moves.copy()
+        self.p1_valid_moves_single_jumps = board.p1_valid_moves_single_jumps.copy()
+        self.p2_valid_moves_single_jumps = board.p2_valid_moves_single_jumps.copy()
         self.p1_pieces = board.p1_pieces.copy()
         self.p2_pieces = board.p2_pieces.copy()
         self.moves_without_capture = board.moves_without_capture
         self.p1_valid_moves_updated = board.p1_valid_moves_updated
         self.p2_valid_moves_updated = board.p2_valid_moves_updated
-        self.p1_valids_list = board.p1_valids_list.copy()
-        self.p2_valids_list = board.p2_valids_list.copy()
+        self.current_player = board.current_player
+        self.chain_jump = board.chain_jump
+        self.chain_jump_from = board.chain_jump_from
 
     def is_valid_position(self, row, column):
         if row >= 0 and row < CheckersBoard.board_height and column >= 0 and column < CheckersBoard.board_width:
@@ -137,6 +146,9 @@ class CheckersBoard():
         self.moves_without_capture += 1
         self.p1_valid_moves_updated = False
         self.p2_valid_moves_updated = False
+        self.current_player *= -1
+        self.chain_jump = False
+        self.chain_jump_from = None
         return True
 
     def get_valid_moves_from_pos(self, player, pos):
@@ -151,18 +163,18 @@ class CheckersBoard():
             new_move.execute_move(player, pos, [x, y])
             valid_moves.append(new_move)
             if row_offset == 1:
-                index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_LEFT.value)
+                index_list.append(self.move_to_index(pos, Direction.DOWN_LEFT.value))
             else:
-                index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_LEFT.value)
+                index_list.append(self.move_to_index(pos, Direction.UP_LEFT.value))
         y = pos[1] + 1
         if self.is_valid_move(player, pos, [x, y]):
             new_move = CheckersBoard(board=self)
             new_move.execute_move(player, pos, [x, y])
             valid_moves.append(new_move)
             if row_offset == 1:
-                index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_RIGHT.value)
+                index_list.append(self.move_to_index(pos, Direction.DOWN_RIGHT.value))
             else:
-                index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_RIGHT.value)
+                index_list.append(self.move_to_index(pos, Direction.UP_RIGHT.value))
         if players_kings[pos[0], pos[1]] == 1:
             x = pos[0] - row_offset
             y = pos[1] - 1
@@ -171,18 +183,18 @@ class CheckersBoard():
                 new_move.execute_move(player, pos, [x, y])
                 valid_moves.append(new_move)
                 if row_offset == 1:
-                    index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_LEFT.value)
+                    index_list.append(self.move_to_index(pos, Direction.UP_LEFT.value))
                 else:
-                    index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_LEFT.value)
+                    index_list.append(self.move_to_index(pos, Direction.DOWN_LEFT.value))
             y = pos[1] + 1
             if self.is_valid_move(player, pos, [x, y]):
                 new_move = CheckersBoard(board=self)
                 new_move.execute_move(player, pos, [x, y])
                 valid_moves.append(new_move)
                 if row_offset == 1:
-                    index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_RIGHT.value)
+                    index_list.append(self.move_to_index(pos, Direction.UP_RIGHT.value))
                 else:
-                    index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_RIGHT.value)
+                    index_list.append(self.move_to_index(pos, Direction.DOWN_RIGHT.value))
         return valid_moves, index_list
 
     def execute_jump(self, player, start, end):
@@ -205,6 +217,12 @@ class CheckersBoard():
         opponent_positions[x, y] = 0
         opponent_kings[x, y] = 0
         del opponent_pieces[(x, y)]
+        if self.can_jump(player, end):
+            self.chain_jump = True
+            self.chain_jump_from = end
+        else:
+            self.chain_jump = False
+            self.current_player *= -1
         if (player == 1 and end[0] == 0) or (player == -1 and end[0] == 7):
             players_kings[end[0], end[1]] = 1
         self.moves_without_capture = 0
@@ -228,94 +246,132 @@ class CheckersBoard():
             return False
         return True
 
-    def get_jumps(self, player, pos):
+    def get_jumps(self, player, pos, include_chain_jumps=True):
         jumps = []
+        chain_jumps = []
         index_list = []
         if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] + 2]):
-            index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_RIGHT.value)
+            index_list.append(self.move_to_index(pos, Direction.DOWN_RIGHT.value, jump=True))
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] + 2, pos[1] + 2]):
-                chain_jumps = new_jump.get_jumps(player, [pos[0] + 2, pos[1] + 2])
-                if len(chain_jumps) > 0:
+                if include_chain_jumps:
+                    chain_jumps, _ = new_jump.get_jumps(player, [pos[0] + 2, pos[1] + 2])
+                if len(chain_jumps) > 0 and include_chain_jumps:
                     jumps = np.hstack((jumps, chain_jumps))
                 else:
                     jumps = np.append(jumps, new_jump)
         if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] - 2]):
-            index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.DOWN_LEFT.value)
+            index_list.append(self.move_to_index(pos, Direction.DOWN_LEFT.value, jump=True))
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] + 2, pos[1] - 2]):
-                chain_jumps = new_jump.get_jumps(player, [pos[0] + 2, pos[1] - 2])
-                if len(chain_jumps) > 0:
+                if include_chain_jumps:
+                    chain_jumps, _ = new_jump.get_jumps(player, [pos[0] + 2, pos[1] - 2])
+                if len(chain_jumps) > 0 and include_chain_jumps:
                     jumps = np.hstack((jumps, chain_jumps))
                 else:
                     jumps = np.append(jumps, new_jump)
         if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] + 2]):
-            index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_RIGHT.value)
+            index_list.append(self.move_to_index(pos, Direction.UP_RIGHT.value, jump=True))
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] - 2, pos[1] + 2]):
-                chain_jumps = new_jump.get_jumps(player, [pos[0] - 2, pos[1] + 2])
-                if len(chain_jumps) > 0:
+                if include_chain_jumps:
+                    chain_jumps, _ = new_jump.get_jumps(player, [pos[0] - 2, pos[1] + 2])
+                if len(chain_jumps) > 0 and include_chain_jumps:
                     jumps = np.hstack((jumps, chain_jumps))
                 else:
                     jumps = np.append(jumps, new_jump)
         if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] - 2]):
-            index_list.append((((pos[0] * 4) + int(pos[1] / 2)) * 4) + Direction.UP_LEFT.value)
+            index_list.append(self.move_to_index(pos, Direction.UP_LEFT.value, jump=True))
             new_jump = CheckersBoard(board=self)
             if new_jump.execute_jump(player, pos, [pos[0] - 2, pos[1] - 2]):
-                chain_jumps = new_jump.get_jumps(player, [pos[0] - 2, pos[1] - 2])
-                if len(chain_jumps) > 0:
+                if include_chain_jumps:
+                    chain_jumps, _ = new_jump.get_jumps(player, [pos[0] - 2, pos[1] - 2])
+                if len(chain_jumps) > 0 and include_chain_jumps:
                     jumps = np.hstack((jumps, chain_jumps))
                 else:
                     jumps = np.append(jumps, new_jump)
         return jumps, index_list
 
-    def get_valid_moves(self, player):
+    def get_valid_moves(self, player, include_index=False, include_chain_jumps=True):
         if player == 1 and self.p1_valid_moves_updated is False:
             self.update_valid_moves(player)
         elif player == -1 and self.p2_valid_moves_updated is False:
             self.update_valid_moves(player)
+        if include_chain_jumps is False:
+            if player == 1:
+                if len(self.p1_valid_moves_single_jumps) > 0:
+                    if include_index:
+                        return self.p1_valid_moves_single_jumps
+                    else:
+                        return [self.p1_valid_moves_single_jumps[x][0] for x in range(len(self.p1_valid_moves_single_jumps))]
+            if player == -1:
+                if len(self.p2_valid_moves_single_jumps) > 0:
+                    if include_index:
+                        return self.p2_valid_moves_single_jumps
+                    else:
+                        return [self.p2_valid_moves_single_jumps[x][0] for x in range(len(self.p2_valid_moves_single_jumps))]
         if player == 1:
-            return self.p1_valid_moves
+            if include_index:
+                return self.p1_valid_moves
+            else:
+                moves = [self.p1_valid_moves[x][0] for x in range(len(self.p1_valid_moves))]
+                return moves
         elif player == -1:
-            return self.p2_valid_moves
+            if include_index:
+                return self.p2_valid_moves
+            else:
+                moves = [self.p2_valid_moves[x][0] for x in range(len(self.p2_valid_moves))]
+                return moves
         return None
 
     def update_valid_moves(self, player):
         valid_moves = []
-        action_indices = []
+        move_indices = []
+        jump_indices = []
         jumps = []
+        single_jumps = []
         player_pieces = self.get_players_pieces(player)
-        if player == 1:
-            self.p1_valids_list = np.zeros(CheckersBoard.action_size)
-        elif player == -1:
-            self.p2_valids_list = np.zeros(CheckersBoard.action_size)
+        if self.chain_jump:
+            new_jumps, new_jump_indices = self.get_jumps(player, self.chain_jump_from)
+            new_single_jumps, single_jump_indices = self.get_jumps(player, self.chain_jump_from, include_chain_jumps=False)
+            if player == 1:
+                self.p1_valid_moves = list(zip(new_jumps, new_jump_indices))
+                self.p1_valid_moves_single_jumps = list(zip(new_single_jumps, single_jump_indices))
+                self.p1_valid_moves_updated = True
+                return
+            elif player == -1:
+                self.p2_valid_moves = list(zip(new_jumps, new_jump_indices))
+                self.p2_valid_moves_single_jumps = list(zip(new_single_jumps, single_jump_indices))
+                self.p2_valid_moves_updated = True
+                return
         for (row, column), king in player_pieces.items():
-            new_moves, move_indices = self.get_valid_moves_from_pos(player, [row, column])
-            new_jumps, jump_indices = self.get_jumps(player, [row, column])
+            new_moves, new_move_indices = self.get_valid_moves_from_pos(player, [row, column])
+            new_jumps, new_jump_indices = self.get_jumps(player, [row, column])
+            new_single_jumps, single_jump_indices = self.get_jumps(player, [row, column], include_chain_jumps=False)
             if len(new_moves) > 0:
                 valid_moves = np.hstack((valid_moves, new_moves))
-                action_indices = np.hstack((action_indices, move_indices))
+                move_indices = np.hstack((move_indices, new_move_indices))
             if len(new_jumps) > 0:
                 jumps = np.hstack((jumps, new_jumps))
-                action_indices = np.hstack((action_indices, jump_indices))
+                jump_indices = np.hstack((jump_indices, new_jump_indices))
+            if len(new_single_jumps) > 0:
+                single_jumps = np.hstack((single_jumps, new_single_jumps))
         if len(jumps) > 0:
             if player == 1:
-                self.p1_valid_moves = jumps
+                self.p1_valid_moves = list(zip(jumps, jump_indices))
+                self.p1_valid_moves_single_jumps = list(zip(single_jumps, jump_indices))
+                self.p1_valid_moves_updated = True
             elif player == -1:
-                self.p2_valid_moves = jumps
+                self.p2_valid_moves = list(zip(jumps, jump_indices))
+                self.p2_valid_moves_single_jumps = list(zip(single_jumps, jump_indices))
+                self.p2_valid_moves_updated = True
         else:
             if player == 1:
-                self.p1_valid_moves = valid_moves
+                self.p1_valid_moves = list(zip(valid_moves, move_indices))
                 self.p1_valid_moves_updated = True
             elif player == -1:
-                self.p2_valid_moves = valid_moves
-                self.p1_valid_moves_updated = True
-        if player == 1:
-            for i in action_indices:
-                self.p1_valids_list[int(i)] = 1
-        elif player == -1:
-            for i in action_indices:
-                self.p2_valids_list[int(i)] = 1
+                self.p2_valid_moves = list(zip(valid_moves, move_indices))
+                self.p2_valid_moves_updated = True
 
     def can_jump(self, player, pos):
         if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] + 2]):
@@ -375,3 +431,11 @@ class CheckersBoard():
         if self.moves_without_capture >= 50:
             return True, 0
         return False, None
+
+    @staticmethod
+    def move_to_index(start_pos, direction, jump=False):
+        tile_index = (start_pos[0] * 4) + (int(start_pos[1] / 2))
+        index = (tile_index * 4) + direction
+        if jump:
+            index += 128
+        return int(index)
