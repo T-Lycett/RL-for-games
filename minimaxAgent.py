@@ -1,5 +1,4 @@
 import math
-import numpy as np
 from random import shuffle
 
 player_1_pos_weights = [[0.75, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.75],
@@ -104,7 +103,6 @@ class MinimaxAgent:
             score += sum(sum((board.p2_positions - board.p2_kings) * player_2_pos_weights))
 
         for pos, king in players_pieces.items():
-            # score += 1 + (0.75 * king) + (abs(self.kings_row - pos[0]) * 0.1 * (1 - king))
             score += 1 + (1.25 * king)
             if king == 1:
                 total_dist = 0
@@ -127,7 +125,6 @@ class MinimaxAgent:
 
         for pos, king in opp_pieces.items():
             score -= opp_piece_val + (1.25 * king)
-            # score -= opp_piece_val + (0.75 * king) + (abs(self.opponent_kings_row - pos[0]) * 0.1 * (1 - king))
 
         return score
 

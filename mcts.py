@@ -31,7 +31,6 @@ class MCTS:
             self.mcts_sims += 1
             self.search(board)
             if self.mcts_sims % 50 == 0:
-                #  print(self.mtcs_sims)
                 new_probs = np.zeros(checkersBoard.CheckersBoard.action_size)
                 counts = np.zeros(checkersBoard.CheckersBoard.action_size)
                 for move, index in valid_moves:
@@ -44,15 +43,10 @@ class MCTS:
                 node_probs = new_probs
                 # print(counts)
 
-
         counts = np.zeros(checkersBoard.CheckersBoard.action_size)
-        q_values = []
         for move, index in valid_moves:
             move = TDAgent.extract_features(move, move.current_player).tobytes()
             counts[int(index)] = self.Nsa[(state, move)] if (state, move) in self.Qsa.keys() else 0
-            # q_values.append(self.Qsa[(state, move)])
-        # print(counts)
-        # print(q_values)
 
         if temperature == 0:
             best_move = np.argmax(counts)
@@ -83,11 +77,9 @@ class MCTS:
 
         valid_moves = board.get_valid_moves(current_player, include_index=True, include_chain_jumps=False)
         if self.Ns[state] == 0:
-            # valids = np.zeros(checkersBoard.CheckersBoard.action_size)
             for move, idx in valid_moves:
                 new_state = TDAgent.extract_features(move, move.current_player).tobytes()
                 self.Ns[new_state] = 0
-                # valids[int(idx)] = 1
             self.Ns[state] += 1
             ended, winner = board.game_ended()
             if ended:
@@ -95,25 +87,15 @@ class MCTS:
             else:
                 features = TDAgent.extract_features(board, current_player)
                 features = np.asarray([features])
-                # v, pi = self.nnet_model.predict(features)
                 v = self.nnet_model.predict(features)
                 v = v[0][0]
-                # pi = pi[0]
-                # if sum(valids) == 0:
-                    # print('error: no valid moves in list.')
-                # else:
-                    # pi *= valids
-                    # pi = [x/float(sum(pi)) if x != 0 else 0 for x in pi]
-                # self.Ps[state] = pi
                 return v
 
         best_u = -math.inf
         best_move = None
         for move, move_index in valid_moves:
-            move_index = int(move_index)
             move_state = TDAgent.extract_features(move, move.current_player).tobytes()
             if (state, move_state) in self.Qsa.keys():
-                # u = self.Qsa[(state, move_state)] + self.cpuct * self.Ps[state][move_index] * math.sqrt(self.Ns[state] / (1 + self.Nsa[(state, move_state)]))
                 u = self.Qsa[(state, move_state)] + self.cpuct * math.sqrt(self.Ns[state] / (1 + self.Nsa[(state, move_state)]))
             else:
                 u = self.cpuct * math.sqrt(self.Ns[state]/1e-8)

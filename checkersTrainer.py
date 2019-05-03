@@ -1,13 +1,11 @@
 import checkersBoard as board
 import minimaxAgent
 import TDAgent
-import random
 import time
 import cProfile, pstats, io
 from pstats import SortKey
 import matplotlib.pyplot as plt
 from multiprocessing import freeze_support
-import QLearner
 import mcts
 
 
@@ -20,7 +18,6 @@ def set_kld_threshold(current_threshold, average_mcts_sims, target_mcts_sims):
         new_threshold = current_threshold - (current_threshold * increment)
     else:
         new_threshold = current_threshold
-    # new_threshold = max(new_threshold, increment)
     print('new kl-divergence threshold: ' + str(new_threshold))
     return new_threshold
 
@@ -40,34 +37,28 @@ if __name__ == '__main__':
         pr =cProfile.Profile()
         pr.enable()
 
-    lr_schedule = {0: 0.0000001}
     opponent_depth = 2
     minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
     TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file)
-    # TD_agent.load_weights('./weights/res_nn_Model')
-    # TD_agent.load_model('cnn64x2.h5')
-    q_learner = QLearner.QLearner()
-    start = time.time()
+
     iterations = 15
     test_games = 10
     kld_threshold = 0.01
     target_average_num_sims = 120
+
     wins = []
     draws = []
     losses = []
-    q_file = './q_values8x6.pickle'
-    # q_learner.load_q_values(q_file)
+    start = time.time()
+
     for i in range(iterations):
         winner = None
         searches = []
-        # if i in lr_schedule:
-            # TD_agent.set_lr(lr_schedule[i])
+
         print('iteration: ' + str(i))
         if i >= 1:
             TD_agent.self_play(kld_threshold, num_games=100, iterations=2)
-        # TD_agent.save_model(model_file)
-        # q_learner.learn(q_file, num_games=1000, iterations=20, opposition_depth=opponent_depth)
-        # q_learner.save_q_values(q_file)
+
         if i >= 0:
             wins.append(0)
             draws.append(0)
@@ -81,9 +72,6 @@ if __name__ == '__main__':
                 b = board.CheckersBoard(True)
                 while not done:
                     num_moves += 1
-                    # for m in p1_moves:
-                    # print(m.p1_positions)
-                    # b.set_positions(random.choice(p1_moves))
                     if b.current_player == 1:
                         print('move ' + str(num_moves) + ' - player 1')
                         move_start_time = time.time()
@@ -103,7 +91,6 @@ if __name__ == '__main__':
                         print('elapsed time: ' + str(move_end_time))
                         if move_end_time != 0:
                             print('nodes per second: ' + str(minimax_agent.nodes_visited / move_end_time))
-                    # p1_move, val = q_learner.get_move(b, 1)
                     try:
                         b.set_positions(move)
                     except:
@@ -115,7 +102,6 @@ if __name__ == '__main__':
                     print('moves until draw: ' + str(50 - b.moves_without_capture))
                     print(str(val))
                     print('')
-                    # time.sleep(5)
                     done, winner = b.game_ended()
                 if winner == 1:
                     wins[int(i/1)] += 1
@@ -129,11 +115,10 @@ if __name__ == '__main__':
             print('max sims: ' + str(max(searches)))
             print('kl-divergence threshold: ' + str(kld_threshold))
             kld_threshold = set_kld_threshold(kld_threshold, average_sims, target_average_num_sims)
-        # plt.cla()
+
         plt.plot(i + 1, wins[i], 'g.', i + 1, draws[i], 'b.', i + 1, losses[i], 'r.')
         plt.pause(0.001)
 
-                # time.sleep(1)
         print('opponent depth: ' + str(opponent_depth))
         print('wins: ' + str(wins))
         print('draws: ' + str(draws))

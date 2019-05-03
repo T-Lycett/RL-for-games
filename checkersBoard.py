@@ -8,13 +8,14 @@ class Direction(Enum):
     DOWN_LEFT = 2
     DOWN_RIGHT = 3
 
-class CheckersBoard():
+
+class CheckersBoard:
 
     board_height = 8
     board_width = 8
     action_size = 256
 
-    def __init__(self, start_positions = False, board = None):
+    def __init__(self, start_positions=False, board=None):
         self.reset()
         if start_positions:
             self.set_start_positions()
