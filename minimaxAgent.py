@@ -82,7 +82,7 @@ class MinimaxAgent:
         has_ended, winner = board.game_ended()
         if has_ended:
             if winner == 0:
-                return -1
+                return 0
             elif winner == self.player:
                 return 100 - num_moves
             else:
@@ -105,11 +105,11 @@ class MinimaxAgent:
 
         for pos, king in players_pieces.items():
             # score += 1 + (0.75 * king) + (abs(self.kings_row - pos[0]) * 0.1 * (1 - king))
-            score += 1 + (0.75 * king)
+            score += 1 + (1.25 * king)
             if king == 1:
                 total_dist = 0
                 for opp_pos, _ in board.get_players_pieces(-self.player).items():
-                    total_dist += self.manhatten_dist(pos, opp_pos) * 0.05
+                    total_dist += self.manhatten_distance(pos, opp_pos) * 0.05
                 mean_dist = total_dist / num_opp_pieces
                 max_dist = max(max_dist, mean_dist)
                 min_dist = min(min_dist, mean_dist)
@@ -126,10 +126,10 @@ class MinimaxAgent:
             opp_piece_val = 0.9
 
         for pos, king in opp_pieces.items():
-            score -= opp_piece_val + (0.75 * king)
+            score -= opp_piece_val + (1.25 * king)
             # score -= opp_piece_val + (0.75 * king) + (abs(self.opponent_kings_row - pos[0]) * 0.1 * (1 - king))
 
         return score
 
-    def manhatten_dist(self, start, end):
+    def manhatten_distance(self, start, end):
         return abs(start[0] - end[0]) + abs(start[1] - end[1])

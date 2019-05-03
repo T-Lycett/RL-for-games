@@ -12,6 +12,8 @@ import threading
 import time
 import mcts
 from utils import weighted_pick
+from multiprocessing import Lock, Value
+from functools import partial
 
 board_height = checkersBoard.CheckersBoard.board_height
 board_width = checkersBoard.CheckersBoard.board_width
@@ -43,12 +45,13 @@ def extract_features(board, current_player):
     return np.array([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw])
 
 
-def get_move(board, player, mcts_instance, temperature):
+def get_move(board, player, mcts_instance, kld_threshold, temperature, max_sims=None):
     moves = board.get_valid_moves(player, include_index=True, include_chain_jumps=False)
     num_moves = len(moves)
     if num_moves == 0:
         return None, None
     if num_moves == 1:
+        mcts_instance.mcts_sims = 0
         probs = np.zeros((checkersBoard.CheckersBoard.action_size))
         index = int(moves[0][1])
         probs[index] = 1
@@ -56,26 +59,40 @@ def get_move(board, player, mcts_instance, temperature):
             print(probs)
         return moves[0][0], probs
     else:
-        probs = mcts_instance.get_probabilities(board, player, num_sims=60, temperature=temperature)
+        probs = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, max_sims=max_sims, temperature=temperature)
         choices = np.ndarray((checkersBoard.CheckersBoard.action_size), dtype=checkersBoard.CheckersBoard)
         for m, i in moves:
             choices[int(i)] = m
         move_index = np.random.multinomial(1, probs)
         move_index = np.where(move_index == 1)[0][0]
         chosen_move = choices[move_index]
-        return chosen_move, probs
+        return chosen_move, probs#
 
 
-def self_play_game_player(model_filename, num_games=1000, noise=0.0):
+def self_play_init(l, val):
+    global self_play_lock
+    self_play_lock = l
+    global games_to_play
+    games_to_play = val
+
+
+def self_play_game_player(model_filename, kld_threshold):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
     sess = tf.Session(config=config)
     keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
     model = keras.models.load_model(model_filename)
-    mcts_instance = mcts.MCTS(model)
+    max_moves_until_t0 = 30
     training_examples = []
     games = 0
-    for g in range(num_games):
+    while True:
+        with self_play_lock:
+            print('games left: ' + str(games_to_play.value))
+            if games_to_play.value == 0:
+                break
+            else:
+                games_to_play.value -= 1
+        mcts_instance = mcts.MCTS(model)
         games += 1
         move_history = []
         game_ended = False
@@ -84,25 +101,35 @@ def self_play_game_player(model_filename, num_games=1000, noise=0.0):
         # state = extract_features(board, current_player)
         # move_history.append([state, False, None, None])
         num_moves = 0
-        moves_until_t0 = 30
+        moves_until_t0 = math.inf  # random.randint(1, max_moves_until_t0)
+        num_mcts_sims = []
         while not game_ended:
             if num_moves < moves_until_t0:
-                move, probs = get_move(board, current_player, mcts_instance, 0.5)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=0.1)
             else:
-                move, probs = get_move(board, current_player, mcts_instance, 0)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0)
+            state = extract_features(board, current_player)
+            assert not np.all(np.isnan(probs))
+            move_history.append([state, current_player, None, probs])
+            if mcts_instance.mcts_sims != 0:
+                num_mcts_sims.append(mcts_instance.mcts_sims)
             if sum(probs) > 1.01:
                 print('error: sum of probabilities is more than 1: ' + str(sum(probs)))
             elif sum(probs) < 0.99:
                 print('error: sum of probabilities is less than 1: ' + str(sum(probs)))
-            state = extract_features(board, current_player)
-            assert not np.all(np.isnan(probs))
-            move_history.append([state, current_player, None, probs])
             board.set_positions(move)
             game_ended, winner = board.game_ended()
             current_player = board.current_player
             num_moves += 1
             # if num_moves % update_frequency == 0 or game_ended:
             if game_ended:
+                if winner == 1:
+                    winner_str = 'player 1'
+                elif winner == -1:
+                    winner_str = 'player 2'
+                else:
+                    winner_str = 'draw'
+                print('finished game, temp = 0 at move ' + str(moves_until_t0) + ', game length: ' + str(num_moves) + ', average mcts sims: ' + str(sum(num_mcts_sims) / len(num_mcts_sims)) + ', max mcts sims: ' + str(max(num_mcts_sims)) + ', winner: ' + winner_str)
                 state = extract_features(board, current_player)
                 assert not np.all(np.isnan(probs))
                 move_history.append([state, current_player, None, probs])
@@ -131,7 +158,7 @@ class TDAgent():
         self.NN = keras.models.load_model(model_filename)
         # self.NN.compile(keras.optimizers.Adam(lr=lr), loss=tf.losses.mean_squared_error)
         if self.learner:
-            self.game_players = int(multiprocessing.cpu_count() / 2)
+            self.game_players = 5  # int(multiprocessing.cpu_count() / 2)
 
     def set_lr(self, lr):
         self.lr = lr
@@ -156,24 +183,36 @@ class TDAgent():
         pieces = pieces[:, ::-1]
         return pieces
 
-    def get_move(self, board, player, mcts_instance):
+    def get_move(self, board, player, mcts_instance, kld_threshold):
         moves = board.get_valid_moves(player, include_index=True, include_chain_jumps=False)
         num_moves = len(moves)
         if num_moves == 0:
             return None, None
         if num_moves == 1:
-            return moves[0][0], self.evaluate(moves[0][0], player)
+            mcts_instance.mcts_sims = 0
+            nn_eval = self.evaluate(moves[0][0], moves[0][0].current_player)
+            if player != moves[0][0].current_player:
+                nn_eval *= -1
+            return moves[0][0], nn_eval
         else:
-            probs = mcts_instance.get_probabilities(board, player, num_sims=60, temperature=0, verbose=True)
+            probs = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, temperature=0, verbose=False)
             choices = np.ndarray(checkersBoard.CheckersBoard.action_size, dtype=checkersBoard.CheckersBoard)
             for move, i in moves:
                 choices[int(i)] = move
             move = choices[weighted_pick(probs)]
-            return move, self.evaluate(move, player)
+
+            current_state = self.extract_features(board, board.current_player).tobytes()
+            move_state = self.extract_features(move, move.current_player).tobytes()
+            nn_val = self.evaluate(move, move.current_player)
+            mcts_val = mcts_instance.Qsa[(current_state, move_state)]
+            if player != move.current_player:
+                nn_val *= -1
+            eval_str = 'Neural Network: ' + str(nn_val[0][0]) + ', MCTS: ' + str(mcts_val)
+            return move, eval_str
 
     def update_model(self, moves, lambda_val, batch_size):
+        print('updating neural network...')
         losses = []
-        shuffle(moves)
         for i, move in enumerate(moves):
             state, _, reward, probs = move
             state = np.asarray([state])
@@ -188,36 +227,56 @@ class TDAgent():
         # self.NN.fit(states, [targets, probs], batch_size=batch_size, epochs=1)
         self.NN.fit(states, [targets], batch_size=batch_size, epochs=1)
 
-    def self_play(self, num_games=1000, iterations=1, lambda_val=0.9, batch_size=1024, noise=0.05):
+    def self_play(self, kld_threshold, num_games=1000, iterations=1, lambda_val=0.9, batch_size=1024):
         if not self.learner:
             return False
         for iteration in range(iterations):
             print('iteration: ' + str(iteration))
+            games_left_to_play = Value('i', num_games)
             # self.evaluation_queue = multiprocessing.Manager().Queue()
             # self.evaluated_positions = [multiprocessing.Manager().dict() for _ in range(self.game_players)]
             # self.pos_eval_worker = multiprocessing.Process(target=self.position_evaluator, args=(self.evaluation_queue, self.evaluated_positions, self.model_filename))
             # self.pos_eval_worker.start()
             keras.backend.clear_session()
-            del self.NN
-            game_player_pool = multiprocessing.Pool(processes=self.game_players)
-            results = [game_player_pool.apply_async(self_play_game_player, args=(self.model_filename, int(num_games / self.game_players), noise)) for p in range(self.game_players)]
+            if self.NN is not None:
+                del self.NN
+                self.NN = None
+            lock = Lock()
+            game_player_pool = multiprocessing.Pool(processes=self.game_players, initializer=self_play_init, initargs=(lock, games_left_to_play,))
+            results = [game_player_pool.apply_async(self_play_game_player, args=(self.model_filename, kld_threshold)) for p in range(self.game_players)]
             game_player_pool.close()
             game_player_pool.join()
-            self.training_examples = [r.get() for r in results]
-            self.training_examples = [item for sublist in self.training_examples for item in sublist]
+            self_play_results = [r.get() for r in results]
+            for sublist in self_play_results:
+                for example in sublist:
+                    self.training_examples.append(example)
+            # self.training_examples = [item for sublist in self.training_examples for item in sublist]
             print('training examples: ' + str(len(self.training_examples)))
-            config = tf.ConfigProto()
-            config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-            self.sess = tf.Session(config=config)
-            keras.backend.set_session(self.sess)  # set this TensorFlow session as the default session for Keras
-            self.NN = keras.models.load_model(self.model_filename)
-            # self.NN.compile(keras.optimizers.Adam(lr=self.lr), loss=tf.losses.mean_squared_error)
-            # self.pos_eval_worker.close()
-            self.training_examples = self.deduplicate_training_data(self.training_examples)
-            while len(self.training_examples) > batch_size:
-                self.update_model(self.training_examples[-batch_size:], lambda_val, batch_size)
-                self.training_examples[-batch_size:] = []
-            # self.save_model(self.model_filename)
+            if len(self.training_examples) > batch_size:
+                config = tf.ConfigProto()
+                config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+                self.sess = tf.Session(config=config)
+                keras.backend.set_session(self.sess)  # set this TensorFlow session as the default session for Keras
+                self.NN = keras.models.load_model(self.model_filename)
+                # self.NN.compile(keras.optimizers.Adam(lr=self.lr), loss=tf.losses.mean_squared_error)
+                # self.pos_eval_worker.close()
+                self.training_examples = self.deduplicate_training_data(self.training_examples)
+                shuffle(self.training_examples)
+                while len(self.training_examples) > batch_size:
+                    try:
+                        self.update_model(self.training_examples[-batch_size:], lambda_val, batch_size)
+                        self.training_examples[-batch_size:] = []
+                    except:
+                        print('possible gpu error')
+                self.save_model(self.model_filename)
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+        self.sess = tf.Session(config=config)
+        keras.backend.set_session(self.sess)  # set this TensorFlow session as the default session for Keras
+        self.NN = keras.models.load_model(self.model_filename)
+
+    def calculate_kld_threshold(self, current_threshold, average_game_length):
+        target_game_length = 125
 
     @staticmethod
     def position_evaluator(evaluation_queue, evaluated_positions, model_filename):

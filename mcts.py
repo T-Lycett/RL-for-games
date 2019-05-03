@@ -2,6 +2,7 @@ import TDAgent
 import math
 import numpy as np
 import checkersBoard
+from scipy import stats
 
 
 class MCTS:
@@ -13,13 +14,37 @@ class MCTS:
         self.Ns = {}
         self.Es = {}
         self.Ps = {}
+        self.mcts_sims = 0
+        self.max_sims = None
+        self.kld_threshold = None
+        self.kl_divergence = None
 
-    def get_probabilities(self, board, player, num_sims=25, temperature=1, verbose=False):
-
-        for i in range(num_sims):
-            self.search(board)
+    def get_probabilities(self, board, player, kld_threshold, max_sims=None, temperature=1, verbose=False):
+        self.mcts_sims = 0
+        self.max_sims = max_sims
+        node_probs = None
+        self.kl_divergence = math.inf
+        self.kld_threshold = kld_threshold
         state = TDAgent.extract_features(board, player).tobytes()
         valid_moves = board.get_valid_moves(player, include_index=True, include_chain_jumps=False)
+        while not self.terminate_search():
+            self.mcts_sims += 1
+            self.search(board)
+            if self.mcts_sims % 50 == 0:
+                #  print(self.mtcs_sims)
+                new_probs = np.zeros(checkersBoard.CheckersBoard.action_size)
+                counts = np.zeros(checkersBoard.CheckersBoard.action_size)
+                for move, index in valid_moves:
+                    move = TDAgent.extract_features(move, move.current_player).tobytes()
+                    counts[int(index)] = self.Nsa[(state, move)] if (state, move) in self.Qsa.keys() else 0
+                new_probs = [x/sum(counts) for x in counts]
+                if node_probs is not None:
+                    self.kl_divergence = stats.entropy(new_probs, node_probs)
+                    # print(kl_divergence)
+                node_probs = new_probs
+                # print(counts)
+
+
         counts = np.zeros(checkersBoard.CheckersBoard.action_size)
         q_values = []
         for move, index in valid_moves:
@@ -72,6 +97,7 @@ class MCTS:
                 features = np.asarray([features])
                 # v, pi = self.nnet_model.predict(features)
                 v = self.nnet_model.predict(features)
+                v = v[0][0]
                 # pi = pi[0]
                 # if sum(valids) == 0:
                     # print('error: no valid moves in list.')
@@ -109,3 +135,15 @@ class MCTS:
 
         self.Ns[state] += 1
         return v
+
+    def terminate_search(self):
+        if self.max_sims is not None:
+            if self.max_sims <= self.mcts_sims:
+                return True
+            else:
+                return False
+        else:
+            if self.kld_threshold >= self.kl_divergence:
+                return True
+            else:
+                return False
