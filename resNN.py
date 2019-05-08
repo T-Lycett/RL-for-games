@@ -5,7 +5,7 @@ import checkersBoard
 
 
 class ResNN():
-    def __init__(self, lr=0.0001, residual_blocks=2, width=64):
+    def __init__(self, lr=0.00001, residual_blocks=2, width=64):
         conv2d = keras.layers.Conv2D
         self.dformat = 'channels_first'
         board_height = checkersBoard.CheckersBoard.board_height
@@ -25,15 +25,14 @@ class ResNN():
         fc1 = keras.layers.Dense(width, activation=tf.nn.relu)(conv_flat)
         self.value = keras.layers.Dense(1, activation=tf.nn.tanh)(fc1)
 
-        # policy = keras.layers.BatchNormalization(axis=1)(conv2d(32, [1, 1], data_format=self.dformat, padding='same', use_bias=False)(res_tower))
-        # policy = keras.layers.Flatten()(policy)
-        # self.probabilities = keras.layers.Dense(checkersBoard.CheckersBoard.action_size, activation=keras.activations.softmax)(policy)
+        policy = keras.layers.BatchNormalization(axis=1)(conv2d(32, [1, 1], data_format=self.dformat, padding='same', use_bias=False)(res_tower))
+        policy = keras.layers.Flatten()(policy)
+        self.probabilities = keras.layers.Dense(checkersBoard.CheckersBoard.action_size, activation=keras.activations.softmax)(policy)
 
-        # self.model = keras.Model(inputs=self.board, outputs=[self.value, self.probabilities])
-        # self.model.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
-        self.model = keras.Model(inputs=self.board, outputs=[self.value])
-        self.model.compile(keras.optimizers.Adam(lr=lr),
-                           loss=[keras.losses.mean_squared_error])
+        self.model = keras.Model(inputs=self.board, outputs=[self.value, self.probabilities])
+        self.model.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
+        # self.model = keras.Model(inputs=self.board, outputs=[self.value])
+        # self.model.compile(keras.optimizers.Adam(lr=lr),loss=[keras.losses.mean_squared_error])
         self.model.summary()
 
     def residual_block(self, input_layer, width):

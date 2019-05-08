@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     freeze_support()
 
-    model_file = 'res128x5T01.h5'
+    model_file = 'res128x5_dual.h5'
 
     profile = False
     if profile:
@@ -48,10 +48,10 @@ if __name__ == '__main__':
     # TD_agent.load_model('cnn64x2.h5')
     q_learner = QLearner.QLearner()
     start = time.time()
-    iterations = 15
+    iterations = 100
     test_games = 10
-    kld_threshold = 0.01
-    target_average_num_sims = 120
+    kld_threshold = 0.0025
+    target_average_num_sims = 100
     wins = []
     draws = []
     losses = []
@@ -151,10 +151,3 @@ if __name__ == '__main__':
         ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
         ps.print_stats()
         print(s.getvalue())
-
-
-
-#print(b.p1_kings)
-#print(b.p2_kings)
-
-

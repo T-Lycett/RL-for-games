@@ -52,21 +52,21 @@ def get_move(board, player, mcts_instance, kld_threshold, temperature, max_sims=
         return None, None
     if num_moves == 1:
         mcts_instance.mcts_sims = 0
-        probs = np.zeros((checkersBoard.CheckersBoard.action_size))
+        exponentiated_probs = np.zeros((checkersBoard.CheckersBoard.action_size))
         index = int(moves[0][1])
-        probs[index] = 1
-        if sum(probs) > 1.01:
-            print(probs)
-        return moves[0][0], probs
+        exponentiated_probs[index] = 1
+        if sum(exponentiated_probs) > 1.01:
+            print(exponentiated_probs)
+        return moves[0][0], exponentiated_probs
     else:
-        probs = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, max_sims=max_sims, temperature=temperature)
+        exponentiated_probs, node_probs = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, max_sims=max_sims, temperature=temperature, dir_alpha=1.5)
         choices = np.ndarray((checkersBoard.CheckersBoard.action_size), dtype=checkersBoard.CheckersBoard)
         for m, i in moves:
             choices[int(i)] = m
-        move_index = np.random.multinomial(1, probs)
+        move_index = np.random.multinomial(1, exponentiated_probs)
         move_index = np.where(move_index == 1)[0][0]
         chosen_move = choices[move_index]
-        return chosen_move, probs#
+        return chosen_move, node_probs
 
 
 def self_play_init(l, val):
@@ -101,13 +101,13 @@ def self_play_game_player(model_filename, kld_threshold):
         # state = extract_features(board, current_player)
         # move_history.append([state, False, None, None])
         num_moves = 0
-        moves_until_t0 = math.inf  # random.randint(1, max_moves_until_t0)
+        moves_until_t0 = math.inf # random.randint(1, max_moves_until_t0)
         num_mcts_sims = []
         while not game_ended:
             if num_moves < moves_until_t0:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=0.1)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=1)
             else:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0.45)
             state = extract_features(board, current_player)
             assert not np.all(np.isnan(probs))
             move_history.append([state, current_player, None, probs])
@@ -129,7 +129,9 @@ def self_play_game_player(model_filename, kld_threshold):
                     winner_str = 'player 2'
                 else:
                     winner_str = 'draw'
-                print('finished game, temp = 0 at move ' + str(moves_until_t0) + ', game length: ' + str(num_moves) + ', average mcts sims: ' + str(sum(num_mcts_sims) / len(num_mcts_sims)) + ', max mcts sims: ' + str(max(num_mcts_sims)) + ', winner: ' + winner_str)
+                print('finished game, temp = 0 at move ' + str(moves_until_t0) + ', game length: ' + str(num_moves) +
+                      ', average mcts sims: ' + str(sum(num_mcts_sims) / len(num_mcts_sims)) + ', max mcts sims: ' +
+                      str(max(num_mcts_sims)) + ', min mcts sims: ' + str(min(num_mcts_sims)) + ', winner: ' + winner_str)
                 state = extract_features(board, current_player)
                 assert not np.all(np.isnan(probs))
                 move_history.append([state, current_player, None, probs])
@@ -190,20 +192,20 @@ class TDAgent():
             return None, None
         if num_moves == 1:
             mcts_instance.mcts_sims = 0
-            nn_eval = self.evaluate(moves[0][0], moves[0][0].current_player)
+            nn_eval = self.evaluate(moves[0][0], moves[0][0].current_player)[0]
             if player != moves[0][0].current_player:
                 nn_eval *= -1
             return moves[0][0], nn_eval
         else:
-            probs = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, temperature=0, verbose=False)
+            exponentiated_probs, _ = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, temperature=0, verbose=True, dir_alpha=0)
             choices = np.ndarray(checkersBoard.CheckersBoard.action_size, dtype=checkersBoard.CheckersBoard)
             for move, i in moves:
                 choices[int(i)] = move
-            move = choices[weighted_pick(probs)]
+            move = choices[weighted_pick(exponentiated_probs)]
 
             current_state = self.extract_features(board, board.current_player).tobytes()
             move_state = self.extract_features(move, move.current_player).tobytes()
-            nn_val = self.evaluate(move, move.current_player)
+            nn_val = self.evaluate(move, move.current_player)[0]
             mcts_val = mcts_instance.Qsa[(current_state, move_state)]
             if player != move.current_player:
                 nn_val *= -1
@@ -223,9 +225,9 @@ class TDAgent():
         targets = np.asarray(targets)
         states = np.reshape(states, newshape=(batch_size, 5, board_height, board_width))
         targets = np.reshape(targets, (-1))
-        # probs = np.reshape(probs, (batch_size, checkersBoard.CheckersBoard.action_size))
-        # self.NN.fit(states, [targets, probs], batch_size=batch_size, epochs=1)
-        self.NN.fit(states, [targets], batch_size=batch_size, epochs=1)
+        probs = np.reshape(probs, (batch_size, checkersBoard.CheckersBoard.action_size))
+        self.NN.fit(states, [targets, probs], batch_size=batch_size, epochs=1)
+        # self.NN.fit(states, [targets], batch_size=batch_size, epochs=1)
 
     def self_play(self, kld_threshold, num_games=1000, iterations=1, lambda_val=0.9, batch_size=1024):
         if not self.learner:
