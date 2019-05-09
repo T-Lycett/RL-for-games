@@ -12,8 +12,8 @@ import mcts
 
 
 def set_kld_threshold(current_threshold, average_mcts_sims, target_mcts_sims):
-    increment = 0.2
-    margin_of_error = 0.05
+    increment = 0.3
+    margin_of_error = 0.1
     if average_mcts_sims > target_mcts_sims + (target_mcts_sims * margin_of_error):
         new_threshold = current_threshold + (current_threshold * increment)
     elif average_mcts_sims < target_mcts_sims - (target_mcts_sims * margin_of_error):
@@ -50,8 +50,8 @@ if __name__ == '__main__':
     start = time.time()
     iterations = 100
     test_games = 10
-    kld_threshold = 0.0025
-    target_average_num_sims = 100
+    kld_threshold = 0.005
+    target_average_num_sims = 75
     wins = []
     draws = []
     losses = []

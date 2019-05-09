@@ -7,7 +7,7 @@ from scipy import stats
 
 class MCTS:
     def __init__(self, nnet_model):
-        self.cpuct = 1
+        self.cpuct = 2
         self.e = 0.75
         self.nnet_model = nnet_model
         self.Qsa = {}
@@ -19,6 +19,7 @@ class MCTS:
         self.max_sims = None
         self.kld_threshold = None
         self.kl_divergence = None
+        self.noise = None
 
     def get_probabilities(self, board, player, kld_threshold, max_sims=None, temperature=1, verbose=False, dir_alpha=0):
         self.mcts_sims = 0
@@ -28,11 +29,13 @@ class MCTS:
         self.kld_threshold = kld_threshold
         state = TDAgent.extract_features(board, player).tobytes()
         valid_moves = board.get_valid_moves(player, include_index=True, include_chain_jumps=False)
+        if dir_alpha > 0:
+            self.noise = np.random.dirichlet([dir_alpha] * len(valid_moves))
         while not self.terminate_search():
             self.mcts_sims += 1
             self.search(board, dir_alpha)
 
-            if self.mcts_sims % 25 == 0:
+            if self.mcts_sims % 20 == 0:
                 #  print(self.mtcs_sims)
                 new_probs = np.zeros(checkersBoard.CheckersBoard.action_size)
                 counts = np.zeros(checkersBoard.CheckersBoard.action_size)
@@ -109,15 +112,13 @@ class MCTS:
         best_u = -math.inf
         best_move = None
         i = 0
-        if dir_alpha != 0:
-            noise = np.random.dirichlet([dir_alpha] * len(valid_moves))
         for move, move_index in valid_moves:
             move_index = int(move_index)
             move_state = TDAgent.extract_features(move, move.current_player).tobytes()
             if (state, move_state) in self.Qsa.keys():
                 p = self.Ps[state][move_index]
                 if dir_alpha != 0:
-                    p = (p * self.e) + noise[i] * (1 - self.e)
+                    p = (p * self.e) + self.noise[i] * (1 - self.e)
                 u = self.Qsa[(state, move_state)] + self.cpuct * p * math.sqrt(self.Ns[state] / (1 + self.Nsa[(state, move_state)]))
                 # u = self.Qsa[(state, move_state)] + self.cpuct * math.sqrt(self.Ns[state] / (1 + self.Nsa[(state, move_state)]))
             else:

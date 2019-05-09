@@ -105,7 +105,7 @@ def self_play_game_player(model_filename, kld_threshold):
         num_mcts_sims = []
         while not game_ended:
             if num_moves < moves_until_t0:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=1)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=1.3)
             else:
                 move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0.45)
             state = extract_features(board, current_player)
