@@ -7,7 +7,7 @@ from scipy import stats
 
 class MCTS:
     def __init__(self, nnet_model):
-        self.cpuct = 0.3
+        self.cpuct = 0.1
         self.nnet_model = nnet_model
         self.Qsa = {}
         self.Nsa = {}
@@ -30,7 +30,7 @@ class MCTS:
         while not self.terminate_search():
             self.mcts_sims += 1
             self.search(board)
-            if self.mcts_sims % 50 == 0:
+            if self.mcts_sims % 10 == 0:
                 new_probs = np.zeros(checkersBoard.CheckersBoard.action_size)
                 counts = np.zeros(checkersBoard.CheckersBoard.action_size)
                 for move, index in valid_moves:
@@ -44,25 +44,24 @@ class MCTS:
                 # print(counts)
 
         counts = np.zeros(checkersBoard.CheckersBoard.action_size)
+        q_values = []
         for move, index in valid_moves:
             move = TDAgent.extract_features(move, move.current_player).tobytes()
             counts[int(index)] = self.Nsa[(state, move)] if (state, move) in self.Qsa.keys() else 0
+            q_values.append(self.Qsa[(state, move)])
 
         if temperature == 0:
             best_move = np.argmax(counts)
             probs = [0]*len(counts)
             probs[best_move] = 1
-            if sum(probs) > 1.01 or verbose:
-                print('counts: ' + str(counts))
-                print('probabilities: ' + str(probs))
-            return probs
         else:
             counts = [x**(1/temperature) for x in counts]
             probs = [x/float(sum(counts)) if x != 0 else 0 for x in counts]
-            if sum(probs) > 1.01 or verbose:
-                print('counts: ' + str(counts))
-                print('probabilities: ' + str(probs))
-            return probs
+        if sum(probs) > 1.01 or verbose:
+            print('counts: ' + str(counts))
+            print('probabilities: ' + str(probs))
+            print('q values: ' + str(q_values))
+        return probs
 
     def search(self, board):
 

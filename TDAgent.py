@@ -59,7 +59,7 @@ def get_move(board, player, mcts_instance, kld_threshold, temperature, max_sims=
         move_index = np.random.multinomial(1, probs)
         move_index = np.where(move_index == 1)[0][0]
         chosen_move = choices[move_index]
-        return chosen_move, probs#
+        return chosen_move, probs
 
 
 def self_play_init(l, val):
@@ -95,7 +95,7 @@ def self_play_game_player(model_filename, kld_threshold):
         num_mcts_sims = []
         while not game_ended:
             if num_moves < moves_until_t0:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=0.1)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=0.5)
             else:
                 move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0)
             state = extract_features(board, current_player)
@@ -182,20 +182,22 @@ class TDAgent:
                 nn_eval *= -1
             return moves[0][0], nn_eval
         else:
-            probs = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, temperature=0, verbose=False)
+            probs = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, temperature=0, verbose=True)
             choices = np.ndarray(checkersBoard.CheckersBoard.action_size, dtype=checkersBoard.CheckersBoard)
             for move, i in moves:
                 choices[int(i)] = move
-            move = choices[weighted_pick(probs)]
+            move_index = np.random.multinomial(1, probs)
+            move_index = np.where(move_index == 1)[0][0]
+            chosen_move = choices[move_index]
 
             current_state = self.extract_features(board, board.current_player).tobytes()
-            move_state = self.extract_features(move, move.current_player).tobytes()
-            nn_val = self.evaluate(move, move.current_player)
+            move_state = self.extract_features(chosen_move, chosen_move.current_player).tobytes()
+            nn_val = self.evaluate(chosen_move, chosen_move.current_player)
             mcts_val = mcts_instance.Qsa[(current_state, move_state)]
-            if player != move.current_player:
+            if player != chosen_move.current_player:
                 nn_val *= -1
             eval_str = 'Neural Network: ' + str(nn_val[0][0]) + ', MCTS: ' + str(mcts_val)
-            return move, eval_str
+            return chosen_move, eval_str
 
     def update_model(self, moves, batch_size):
         print('updating neural network...')

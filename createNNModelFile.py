@@ -8,4 +8,4 @@ def create_model_file(filename):
 
 
 if __name__ == '__main__':
-    create_model_file('res128x5T01.h5')
+    create_model_file('res128x5_demo.h5')
