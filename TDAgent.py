@@ -59,7 +59,7 @@ def get_move(board, player, mcts_instance, kld_threshold, temperature, max_sims=
             print(exponentiated_probs)
         return moves[0][0], exponentiated_probs
     else:
-        exponentiated_probs, node_probs = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, max_sims=max_sims, temperature=temperature, dir_alpha=1.5)
+        exponentiated_probs, node_probs = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, max_sims=max_sims, temperature=temperature, dir_alpha=1.75)
         choices = np.ndarray((checkersBoard.CheckersBoard.action_size), dtype=checkersBoard.CheckersBoard)
         for m, i in moves:
             choices[int(i)] = m
@@ -105,7 +105,7 @@ def self_play_game_player(model_filename, kld_threshold):
         num_mcts_sims = []
         while not game_ended:
             if num_moves < moves_until_t0:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=1.3)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=1.25)
             else:
                 move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0.45)
             state = extract_features(board, current_player)
@@ -160,10 +160,12 @@ class TDAgent():
         self.NN = keras.models.load_model(model_filename)
         # self.NN.compile(keras.optimizers.Adam(lr=lr), loss=tf.losses.mean_squared_error)
         if self.learner:
-            self.game_players = 5  # int(multiprocessing.cpu_count() / 2)
+            self.game_players = 4  # int(multiprocessing.cpu_count() / 2)
 
     def set_lr(self, lr):
         self.lr = lr
+        self.NN.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
+        print('set learning rate to ' + str(lr))
 
     @staticmethod
     def extract_features(board, current_player):

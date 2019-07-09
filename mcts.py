@@ -7,7 +7,7 @@ from scipy import stats
 
 class MCTS:
     def __init__(self, nnet_model):
-        self.cpuct = 2
+        self.cpuct = 0.5
         self.e = 0.75
         self.nnet_model = nnet_model
         self.Qsa = {}
@@ -39,24 +39,30 @@ class MCTS:
                 #  print(self.mtcs_sims)
                 new_probs = np.zeros(checkersBoard.CheckersBoard.action_size)
                 counts = np.zeros(checkersBoard.CheckersBoard.action_size)
+                q_values = np.zeros(checkersBoard.CheckersBoard.action_size)
                 for move, index in valid_moves:
+                    index = int(index)
                     move = TDAgent.extract_features(move, move.current_player).tobytes()
-                    counts[int(index)] = self.Nsa[(state, move)] if (state, move) in self.Qsa.keys() else 0
+                    counts[index] = self.Nsa[(state, move)] if (state, move) in self.Qsa.keys() else 0
+                    q_values[index] = self.Qsa[(state, move)] if (state, move) in self.Qsa.keys() else 0
                 new_probs = [x/sum(counts) for x in counts]
                 if node_probs is not None:
                     self.kl_divergence = stats.entropy(new_probs, node_probs)
                     # print(kl_divergence)
                 node_probs = new_probs
                 # print(counts)
+                if verbose:
+                    print('counts: ' + str([x for x in counts if x != 0]))
+                    print('probabilities: ' + str([x for x in node_probs if x != 0]))
+                    print('q values: ' + str([x for x in q_values if x != 0]))
 
+        if verbose:
+            print('prior probs: ' + str([x for x in self.Ps[state] if x != 0]))
 
         counts = np.zeros(checkersBoard.CheckersBoard.action_size)
-        q_values = []
         for move, index in valid_moves:
             move = TDAgent.extract_features(move, move.current_player).tobytes()
             counts[int(index)] = self.Nsa[(state, move)] if (state, move) in self.Qsa.keys() else 0
-            q_values.append(self.Qsa[(state, move)])
-        # print(counts)
 
         if temperature == 0:
             best_move = np.argmax(counts)
@@ -65,11 +71,7 @@ class MCTS:
         else:
             counts = [x**(1/temperature) for x in counts]
             exponentiated_probs = [x/float(sum(counts)) if x != 0 else 0 for x in counts]
-        if sum(exponentiated_probs) > 1.01 or verbose:
-            print('counts: ' + str(counts))
-            print('probabilities: ' + str(node_probs))
-            print('prior probs: ' + str(self.Ps[state]))
-            print(q_values)
+
         return exponentiated_probs, node_probs
 
     def search(self, board, dir_alpha=0):
