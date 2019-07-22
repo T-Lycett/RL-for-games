@@ -5,7 +5,7 @@ import checkersBoard
 
 
 class ResNN():
-    def __init__(self, lr=0.00001, residual_blocks=2, width=64):
+    def __init__(self, lr=0.000001, residual_blocks=2, width=64):
         conv2d = keras.layers.Conv2D
         self.dformat = 'channels_first'
         board_height = checkersBoard.CheckersBoard.board_height

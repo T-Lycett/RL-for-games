@@ -85,6 +85,7 @@ def self_play_game_player(model_filename, kld_threshold):
     max_moves_until_t0 = 30
     training_examples = []
     games = 0
+    game_id = -1
     while True:
         with self_play_lock:
             print('games left: ' + str(games_to_play.value))
@@ -92,6 +93,8 @@ def self_play_game_player(model_filename, kld_threshold):
                 break
             else:
                 games_to_play.value -= 1
+                game_id = games_to_play.value
+                print('started game ' + str(game_id))
         mcts_instance = mcts.MCTS(model)
         games += 1
         move_history = []
@@ -105,7 +108,7 @@ def self_play_game_player(model_filename, kld_threshold):
         num_mcts_sims = []
         while not game_ended:
             if num_moves < moves_until_t0:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=1.25)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=1)
             else:
                 move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0.45)
             state = extract_features(board, current_player)
@@ -129,7 +132,7 @@ def self_play_game_player(model_filename, kld_threshold):
                     winner_str = 'player 2'
                 else:
                     winner_str = 'draw'
-                print('finished game, temp = 0 at move ' + str(moves_until_t0) + ', game length: ' + str(num_moves) +
+                print('finished game ' + str(game_id) + ', temp = 0 at move ' + str(moves_until_t0) + ', game length: ' + str(num_moves) +
                       ', average mcts sims: ' + str(sum(num_mcts_sims) / len(num_mcts_sims)) + ', max mcts sims: ' +
                       str(max(num_mcts_sims)) + ', min mcts sims: ' + str(min(num_mcts_sims)) + ', winner: ' + winner_str)
                 state = extract_features(board, current_player)
@@ -166,6 +169,7 @@ class TDAgent():
         self.lr = lr
         self.NN.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
         print('set learning rate to ' + str(lr))
+        self.save_model(self.model_filename)
 
     @staticmethod
     def extract_features(board, current_player):
@@ -332,6 +336,7 @@ class TDAgent():
 
     def save_model(self, filepath):
         self.NN.save(filepath)
+        print('neural network model saved to ' + self.model_filename)
 
     def load_model(self, filepath):
         self.model_filename = filepath

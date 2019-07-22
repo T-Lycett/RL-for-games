@@ -20,6 +20,7 @@ class MCTS:
         self.kld_threshold = None
         self.kl_divergence = None
         self.noise = None
+        self.eval_batch_size = 5
 
     def get_probabilities(self, board, player, kld_threshold, max_sims=None, temperature=1, verbose=False, dir_alpha=0):
         self.mcts_sims = 0
@@ -73,6 +74,9 @@ class MCTS:
             exponentiated_probs = [x/float(sum(counts)) if x != 0 else 0 for x in counts]
 
         return exponentiated_probs, node_probs
+
+    # def batch_search(self, root_node, dir_alpha=0):
+
 
     def search(self, board, dir_alpha=0):
 

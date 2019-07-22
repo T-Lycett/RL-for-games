@@ -34,14 +34,14 @@ if __name__ == '__main__':
 
     freeze_support()
 
-    model_file = 'res128x5_dual_lr10-3.h5'
+    model_file = 'res128x5_dual_lr10-6.h5'
 
     profile = False
     if profile:
         pr =cProfile.Profile()
         pr.enable()
 
-    lr_schedule = {}
+    lr_schedule = {0: 0.000001}
     opponent_depth = 3
     minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
     TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file)
@@ -51,8 +51,9 @@ if __name__ == '__main__':
     start = time.time()
     iterations = 1000
     test_games = 10
-    kld_threshold = 0.001
-    target_average_num_sims = 100
+    kld_threshold = 0.01
+    target_average_num_sims = 60
+    calibration_runs = 1
     wins = []
     draws = []
     losses = []
@@ -64,7 +65,7 @@ if __name__ == '__main__':
         if i in lr_schedule:
             TD_agent.set_lr(lr_schedule[i])
         print('iteration: ' + str(i))
-        if i >= 2:
+        if i >= calibration_runs:
             TD_agent.self_play(kld_threshold, num_games=100, iterations=2)
         # TD_agent.save_model(model_file)
         # q_learner.learn(q_file, num_games=1000, iterations=20, opposition_depth=opponent_depth)
