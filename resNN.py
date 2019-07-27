@@ -30,8 +30,13 @@ class ResNN():
             policy = keras.layers.Flatten()(policy)
             self.probabilities = keras.layers.Dense(checkersBoard.CheckersBoard.action_size, activation=keras.activations.softmax)(policy)
 
-        self.model = keras.Model(inputs=self.board, outputs=[self.value, self.probabilities])
-        self.model.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
+        if not q_learning_only:
+            self.model = keras.Model(inputs=self.board, outputs=[self.value, self.probabilities])
+            self.model.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
+        else:
+            self.model = keras.Model(inputs=self.board, outputs=self.value)
+            self.model.compile(keras.optimizers.Adam(lr=lr), loss=keras.losses.mean_squared_error)
+
         # self.model = keras.Model(inputs=self.board, outputs=[self.value])
         # self.model.compile(keras.optimizers.Adam(lr=lr),loss=[keras.losses.mean_squared_error])
         self.model.summary()
