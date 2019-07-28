@@ -89,7 +89,7 @@ if __name__ == '__main__':
                     # print(m.p1_positions)
                     # b.set_positions(random.choice(p1_moves))
                     if b.current_player == 1:
-                        print('move ' + str(num_moves) + ' - player 1')
+                        print('game ' + str(g + 1) + ' - move ' + str(num_moves) + ' - player 1')
                         move_start_time = time.time()
                         move, val = TD_agent.get_move(b, 1, mcts_instance, kld_threshold)
                         move_end_time = time.time() - move_start_time
@@ -100,7 +100,7 @@ if __name__ == '__main__':
                                 print('nodes per second: ' + str(mcts_instance.mcts_sims / move_end_time))
                             searches.append(mcts_instance.mcts_sims)
                     else:
-                        print('move ' + str(num_moves) + ' - player 2')
+                        print('game ' + str(g + 1) + ' - move ' + str(num_moves) + ' - player 2')
                         move_start_time = time.time()
                         move, val = minimax_agent.get_move(b)
                         move_end_time = time.time() - move_start_time
@@ -127,16 +127,16 @@ if __name__ == '__main__':
                     draws[int(i/1)] += 1
                 elif winner == -1:
                     losses[int(i/1)] += 1
+                plt.cla()
+                plt.plot(range(1, 1 + len(wins)), wins, 'g.', range(1, 1 + len(draws)), draws, 'b.', range(1, 1 + len(losses)), losses, 'r.')
+                plt.pause(0.001)
+
             average_sims = sum(searches) / len(searches)
             print('average sims: ' + str(average_sims))
             print('min sims: ' + str(min(searches)))
             print('max sims: ' + str(max(searches)))
             print('kl-divergence threshold: ' + str(kld_threshold))
             kld_threshold = set_kld_threshold(kld_threshold, average_sims, target_average_num_sims)
-        # plt.cla()
-        plt.plot(i + 1, wins[i], 'g.', i + 1, draws[i], 'b.', i + 1, losses[i], 'r.')
-        plt.pause(0.001)
-
                 # time.sleep(1)
         print('opponent depth: ' + str(opponent_depth))
         print('wins: ' + str(wins))
