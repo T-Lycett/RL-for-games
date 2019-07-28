@@ -76,7 +76,7 @@ def self_play_init(l, val):
     games_to_play = val
 
 
-def self_play_game_player(model_filename, kld_threshold):
+def self_play_game_player(model_filename, kld_threshold, q_learning):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
     sess = tf.Session(config=config)
@@ -95,7 +95,7 @@ def self_play_game_player(model_filename, kld_threshold):
                 games_to_play.value -= 1
                 game_id = games_to_play.value
                 print('started game ' + str(game_id))
-        mcts_instance = mcts.MCTS(model)
+        mcts_instance = mcts.MCTS(model, use_policy_head=not q_learning)
         games += 1
         move_history = []
         game_ended = False
@@ -108,9 +108,9 @@ def self_play_game_player(model_filename, kld_threshold):
         num_mcts_sims = []
         while not game_ended:
             if num_moves < moves_until_t0:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=1)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=0.2)
             else:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0.45)
+                move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0.05)
             state = extract_features(board, current_player)
             assert not np.all(np.isnan(probs))
             move_history.append([state, current_player, None, probs])
@@ -136,7 +136,8 @@ def self_play_game_player(model_filename, kld_threshold):
                       ', average mcts sims: ' + str(sum(num_mcts_sims) / len(num_mcts_sims)) + ', max mcts sims: ' +
                       str(max(num_mcts_sims)) + ', min mcts sims: ' + str(min(num_mcts_sims)) + ', winner: ' + winner_str)
                 state = extract_features(board, current_player)
-                assert not np.all(np.isnan(probs))
+                if not q_learning:
+                    assert not np.all(np.isnan(probs))
                 move_history.append([state, current_player, None, probs])
                 for i, (_, cur_player, r, _) in enumerate(move_history):
                     move_history[i][2] = cur_player * winner
@@ -148,7 +149,8 @@ def self_play_game_player(model_filename, kld_threshold):
 
 
 class TDAgent():
-    def __init__(self, model_filename, learner=True, lr=0.0001, search_depth=3):
+    def __init__(self, model_filename, learner=True, lr=0.0001, search_depth=3, q_learning=True):
+        self.q_learning = q_learning
         self.learner = learner
         self.lr = lr
         self.search_depth = search_depth
@@ -167,7 +169,10 @@ class TDAgent():
 
     def set_lr(self, lr):
         self.lr = lr
-        self.NN.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
+        if self.q_learning:
+            self.NN.compile(keras.optimizers.Adam(lr=lr), loss=keras.losses.mean_squared_error)
+        else:
+            self.NN.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
         print('set learning rate to ' + str(lr))
         self.save_model(self.model_filename)
 
@@ -215,7 +220,7 @@ class TDAgent():
             mcts_val = mcts_instance.Qsa[(current_state, move_state)]
             if player != move.current_player:
                 nn_val *= -1
-            eval_str = 'Neural Network: ' + str(nn_val[0][0]) + ', MCTS: ' + str(mcts_val)
+            eval_str = 'Neural Network: ' + str(nn_val) + ', MCTS: ' + str(mcts_val)
             return move, eval_str
 
     def update_model(self, moves, lambda_val, batch_size):
@@ -231,9 +236,11 @@ class TDAgent():
         targets = np.asarray(targets)
         states = np.reshape(states, newshape=(batch_size, 5, board_height, board_width))
         targets = np.reshape(targets, (-1))
-        probs = np.reshape(probs, (batch_size, checkersBoard.CheckersBoard.action_size))
-        self.NN.fit(states, [targets, probs], batch_size=batch_size, epochs=1)
-        # self.NN.fit(states, [targets], batch_size=batch_size, epochs=1)
+        if self.q_learning:
+            self.NN.fit(states, [targets], batch_size=batch_size, epochs=1)
+        else:
+            probs = np.reshape(probs, (batch_size, checkersBoard.CheckersBoard.action_size))
+            self.NN.fit(states, [targets, probs], batch_size=batch_size, epochs=1)
 
     def self_play(self, kld_threshold, num_games=1000, iterations=1, lambda_val=0.9, batch_size=1024):
         if not self.learner:
@@ -251,7 +258,7 @@ class TDAgent():
                 self.NN = None
             lock = Lock()
             game_player_pool = multiprocessing.Pool(processes=self.game_players, initializer=self_play_init, initargs=(lock, games_left_to_play,))
-            results = [game_player_pool.apply_async(self_play_game_player, args=(self.model_filename, kld_threshold)) for p in range(self.game_players)]
+            results = [game_player_pool.apply_async(self_play_game_player, args=(self.model_filename, kld_threshold, self.q_learning)) for p in range(self.game_players)]
             game_player_pool.close()
             game_player_pool.join()
             self_play_results = [r.get() for r in results]

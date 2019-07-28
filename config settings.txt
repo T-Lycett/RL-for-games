@@ -1,0 +1,7 @@
+alphazero
+
+kld_threshold = 0.01
+self.cpuct = 0.5
+temperature=1
+moves_until_t0 = math.inf
+lr=0.000001

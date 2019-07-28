@@ -34,26 +34,28 @@ if __name__ == '__main__':
 
     freeze_support()
 
-    model_file = 'res128x5_dual_lr10-6.h5'
+    model_file = 'res64x3.h5'
 
     profile = False
     if profile:
         pr =cProfile.Profile()
         pr.enable()
 
-    lr_schedule = {0: 0.000001}
-    opponent_depth = 3
+    q_learning_only = True
+    lr_schedule = {}
+    opponent_depth = 2
+    max_opponent_depth = 6
     minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
-    TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file)
+    TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file, q_learning=q_learning_only)
     # TD_agent.load_weights('./weights/res_nn_Model')
     # TD_agent.load_model('cnn64x2.h5')
     q_learner = QLearner.QLearner()
     start = time.time()
     iterations = 1000
     test_games = 10
-    kld_threshold = 0.01
-    target_average_num_sims = 60
-    calibration_runs = 1
+    kld_threshold = 0.005
+    target_average_num_sims = 100
+    calibration_runs = 2
     wins = []
     draws = []
     losses = []
@@ -66,7 +68,7 @@ if __name__ == '__main__':
             TD_agent.set_lr(lr_schedule[i])
         print('iteration: ' + str(i))
         if i >= calibration_runs:
-            TD_agent.self_play(kld_threshold, num_games=100, iterations=2)
+            TD_agent.self_play(kld_threshold, num_games=100, iterations=1)
         # TD_agent.save_model(model_file)
         # q_learner.learn(q_file, num_games=1000, iterations=20, opposition_depth=opponent_depth)
         # q_learner.save_q_values(q_file)
@@ -79,7 +81,7 @@ if __name__ == '__main__':
                 num_moves = 0
                 done = False
                 minimax_agent = minimaxAgent.MinimaxAgent(-1, opponent_depth)
-                mcts_instance = mcts.MCTS(TD_agent.NN)
+                mcts_instance = mcts.MCTS(TD_agent.NN, use_policy_head=not q_learning_only)
                 b = board.CheckersBoard(True)
                 while not done:
                     num_moves += 1
@@ -142,7 +144,7 @@ if __name__ == '__main__':
         print('losses: ' + str(losses))
         if losses[int(i)] == 0:
             opponent_depth += 1
-            opponent_depth = min(3, opponent_depth)
+            opponent_depth = min(max_opponent_depth, opponent_depth)
         print('average time per iteration: ' + str((time.time() - start) / (i + 1)))
     plt.show()
     if profile:
