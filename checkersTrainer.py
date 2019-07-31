@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     freeze_support()
 
-    model_file = 'res64x3.h5'
+    model_file = 'res128x5.h5'
 
     profile = False
     if profile:
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     q_learning_only = True
     lr_schedule = {}
     opponent_depth = 2
-    max_opponent_depth = 6
+    max_opponent_depth = 7
     minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
     TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file, q_learning=q_learning_only)
     # TD_agent.load_weights('./weights/res_nn_Model')
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     test_games = 10
     kld_threshold = 0.005
     target_average_num_sims = 100
-    calibration_runs = 2
+    calibration_runs = 20
     wins = []
     draws = []
     losses = []
