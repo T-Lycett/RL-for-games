@@ -217,7 +217,7 @@ class TDAgent():
             current_state = self.extract_features(board, board.current_player).tobytes()
             move_state = self.extract_features(move, move.current_player).tobytes()
             nn_val = self.evaluate(move, move.current_player)[0]
-            mcts_val = mcts_instance.Qsa[(current_state, move_state)]
+            mcts_val = mcts_instance.Qs[(current_state)]
             if player != move.current_player:
                 nn_val *= -1
             eval_str = 'Neural Network: ' + str(nn_val) + ', MCTS: ' + str(mcts_val)

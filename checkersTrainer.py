@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     freeze_support()
 
-    model_file = 'res64x3.h5'
+    model_file = 'res128x5.h5'
 
     profile = False
     if profile:
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     test_games = 10
     kld_threshold = 0.005
     target_average_num_sims = 100
-    calibration_runs = 2
+    calibration_runs = 10
     wins = []
     draws = []
     losses = []
