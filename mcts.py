@@ -8,7 +8,7 @@ from scipy import stats
 class MCTS:
     def __init__(self, nnet_model, use_policy_head=True):
         self.use_policy_head = use_policy_head
-        self.cpuct = 0.3
+        self.cpuct = 0.1
         self.e = 0.75
         self.nnet_model = nnet_model
         self.Qs = {}
@@ -24,6 +24,7 @@ class MCTS:
         self.kl_divergence = None
         self.noise = None
         self.eval_batch_size = 5
+        self.max_depth = 0
 
     def get_probabilities(self, board, player, kld_threshold, max_sims=None, temperature=1, verbose=False, dir_alpha=0):
         self.mcts_sims = 0
@@ -38,9 +39,10 @@ class MCTS:
 
         self.v_lower_bound[(state)] = -math.inf
         self.v_upper_bound[(state)] = math.inf
+        self.max_depth = 0
         while not self.terminate_search():
             self.mcts_sims += 1
-            self.search(board, self.v_lower_bound[(state)], self.v_upper_bound[(state)], dir_alpha)
+            self.search(board, self.v_lower_bound[(state)], self.v_upper_bound[(state)], 0, dir_alpha)
 
             if self.mcts_sims % 25 == 0:
                 #  print(self.mtcs_sims)
@@ -81,7 +83,7 @@ class MCTS:
         for move, index in valid_moves:
             move = TDAgent.extract_features(move, move.current_player).tobytes()
             counts[int(index)] = self.Nsa[(state, move)] if (state, move) in self.Nsa.keys() else 0
-            child_scores[int(index)] = self.Qs[(move)] + 1 if (state) in self.Qs.keys() else -2
+            child_scores[int(index)] = self.Qs[(move)] + 2 if (move) in self.Qs.keys() else -2
 
         if temperature == 0:
             best_move = np.argmax(child_scores)
@@ -96,7 +98,9 @@ class MCTS:
     # def batch_search(self, root_node, dir_alpha=0):
 
 
-    def search(self, board, alpha, beta, dir_alpha=0):
+    def search(self, board, alpha, beta, depth, dir_alpha=0):
+        self.max_depth = max(self.max_depth, depth)
+        depth = depth + 1
 
         current_player = board.current_player
         state = TDAgent.extract_features(board, current_player).tobytes()
@@ -145,19 +149,32 @@ class MCTS:
         if current_player == 1:
             v_lower = -math.inf
             v_upper = -math.inf
+            child_exists = False
+            all_child_nodes_expanded = True
             for move, move_index in valid_moves:
                 move_state = TDAgent.extract_features(move, move.current_player).tobytes()
-                v_lower = max(v_lower, self.v_lower_bound[(move_state)])
-                v_upper = max(v_upper, self.v_upper_bound[(state)])
+                if (move_state) in self.Qs.keys():
+                    v_lower = max(v_lower, self.v_lower_bound[(move_state)])
+                    v_upper = max(v_upper, self.v_upper_bound[(state)])
+                    child_exists = True
+                else:
+                    all_child_nodes_expanded = False
         else:
             v_lower = math.inf
             v_upper = math.inf
+            child_exists = False
+            all_child_nodes_expanded = True
             for move, move_index in valid_moves:
                 move_state = TDAgent.extract_features(move, move.current_player).tobytes()
-                v_lower = min(v_lower, self.v_lower_bound[(move_state)])
-                v_upper = min(v_upper, self.v_upper_bound[(state)])
-        self.v_lower_bound[(state)] = v_lower
-        self.v_upper_bound[(state)] = v_upper
+                if (move_state) in self.Qs.keys():
+                    v_lower = min(v_lower, self.v_lower_bound[(move_state)])
+                    v_upper = min(v_upper, self.v_upper_bound[(state)])
+                    child_exists = True
+                else:
+                    all_child_nodes_expanded = False
+        if child_exists and all_child_nodes_expanded:
+            self.v_lower_bound[(state)] = v_lower
+            self.v_upper_bound[(state)] = v_upper
 
         best_u = -math.inf
         best_move = None
@@ -167,7 +184,7 @@ class MCTS:
             move_state = TDAgent.extract_features(move, move.current_player).tobytes()
             alphac = max(alpha, self.v_lower_bound[(move_state)])
             betac = min(beta, self.v_upper_bound[(move_state)])
-            if alphac < betac:
+            if True: # alphac < betac:
                 if (state, move_state) in self.Nsa.keys() and (move_state) in self.Qs.keys():
                     p = self.Ps[state][move_index]
                     if dir_alpha != 0 and self.use_policy_head:
@@ -183,7 +200,7 @@ class MCTS:
 
         if best_move is not None:
             move_state = TDAgent.extract_features(best_move, best_move.current_player).tobytes()
-            self.search(best_move, self.v_lower_bound[(move_state)], self.v_upper_bound[(move_state)])
+            self.search(best_move, self.v_lower_bound[(move_state)], self.v_upper_bound[(move_state)], depth)
         # if current_player != best_move.current_player:
             # v *= -1
 

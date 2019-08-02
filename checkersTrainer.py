@@ -43,8 +43,8 @@ if __name__ == '__main__':
 
     q_learning_only = True
     lr_schedule = {}
-    opponent_depth = 2
-    max_opponent_depth = 6
+    opponent_depth = 7
+    max_opponent_depth = 8
     minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
     TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file, q_learning=q_learning_only)
     # TD_agent.load_weights('./weights/res_nn_Model')
@@ -53,9 +53,9 @@ if __name__ == '__main__':
     start = time.time()
     iterations = 1000
     test_games = 10
-    kld_threshold = 0.005
-    target_average_num_sims = 100
-    calibration_runs = 10
+    kld_threshold = 0.00288
+    target_average_num_sims = 300
+    calibration_runs = 20
     wins = []
     draws = []
     losses = []
@@ -95,6 +95,7 @@ if __name__ == '__main__':
                         move_end_time = time.time() - move_start_time
                         print('elapsed time: ' + str(move_end_time))
                         if mcts_instance.mcts_sims != 0:
+                            print('max depth: ' + str(mcts_instance.max_depth))
                             print('number of simulations: ' + str(mcts_instance.mcts_sims))
                             if move_end_time != 0:
                                 print('nodes per second: ' + str(mcts_instance.mcts_sims / move_end_time))

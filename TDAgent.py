@@ -208,7 +208,7 @@ class TDAgent():
                 nn_eval *= -1
             return moves[0][0], nn_eval
         else:
-            exponentiated_probs, _ = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, temperature=0, verbose=True, dir_alpha=0)
+            exponentiated_probs, _ = mcts_instance.get_probabilities(board, player, kld_threshold=kld_threshold, temperature=0, verbose=False, dir_alpha=0)
             choices = np.ndarray(checkersBoard.CheckersBoard.action_size, dtype=checkersBoard.CheckersBoard)
             for move, i in moves:
                 choices[int(i)] = move

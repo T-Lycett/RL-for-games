@@ -4,9 +4,7 @@
     <list default="true" id="d3cb5326-d5e0-4bad-a012-fe46e8365323" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/TDAgent.py" beforeDir="false" afterPath="$PROJECT_DIR$/TDAgent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/checkersTrainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/checkersTrainer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/createNNModelFile.py" beforeDir="false" afterPath="$PROJECT_DIR$/createNNModelFile.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mcts.py" beforeDir="false" afterPath="$PROJECT_DIR$/mcts.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/res64x3.h5" beforeDir="false" afterPath="$PROJECT_DIR$/res64x3.h5" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -16,11 +14,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/checkersTrainer.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="70">
-              <caret line="45" column="22" selection-start-line="45" selection-start-column="22" selection-end-line="45" selection-end-column="22" />
+            <state relative-caret-position="60">
+              <caret line="55" column="23" selection-start-line="55" selection-start-column="23" selection-end-line="55" selection-end-column="23" />
               <folding>
                 <element signature="e#0#29#0" expanded="true" />
               </folding>
@@ -31,7 +29,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/minimaxAgent.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state>
+            <state relative-caret-position="-765">
               <caret column="11" selection-start-column="11" selection-end-column="11" />
             </state>
           </provider>
@@ -50,22 +48,10 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/mcts.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="165">
-              <caret line="10" column="24" selection-start-line="10" selection-start-column="24" selection-end-line="10" selection-end-column="24" />
-              <folding>
-                <element signature="e#0#14#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/createNNModelFile.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="170">
-              <caret line="10" column="30" selection-start-line="10" selection-start-column="30" selection-end-line="10" selection-end-column="30" />
+            <state relative-caret-position="85">
+              <caret line="5" column="33" selection-start-line="5" selection-start-column="33" selection-end-line="5" selection-end-column="33" />
               <folding>
                 <element signature="e#0#10#0" expanded="true" />
               </folding>
@@ -73,7 +59,7 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/resNN.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="68">
@@ -85,10 +71,22 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TDAgent.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="199">
-              <caret line="110" column="121" selection-start-line="110" selection-start-column="121" selection-end-line="110" selection-end-column="121" />
+            <state relative-caret-position="203">
+              <caret line="210" column="141" selection-start-line="210" selection-start-column="141" selection-end-line="210" selection-end-column="141" />
               <folding>
                 <element signature="e#0#23#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/mcts.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="340">
+              <caret line="44" column="91" selection-start-line="44" selection-start-column="91" selection-end-line="44" selection-end-column="91" />
+              <folding>
+                <element signature="e#0#14#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -129,9 +127,9 @@
         <option value="$PROJECT_DIR$/checkers.py" />
         <option value="$PROJECT_DIR$/minimaxAgent.py" />
         <option value="$PROJECT_DIR$/resNN.py" />
-        <option value="$PROJECT_DIR$/mcts.py" />
-        <option value="$PROJECT_DIR$/TDAgent.py" />
         <option value="$PROJECT_DIR$/createNNModelFile.py" />
+        <option value="$PROJECT_DIR$/TDAgent.py" />
+        <option value="$PROJECT_DIR$/mcts.py" />
         <option value="$PROJECT_DIR$/checkersTrainer.py" />
       </list>
     </option>
@@ -259,7 +257,6 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="-7" y="-7" width="2575" height="1415" extended-state="6" />
-    <editor active="true" />
     <layout>
       <window_info id="Structure" order="0" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="1" side_tool="true" />
@@ -269,7 +266,7 @@
       <window_info anchor="bottom" id="Event Log" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="3" />
       <window_info anchor="bottom" id="Find" order="4" weight="0.32969603" />
-      <window_info active="true" anchor="bottom" id="Run" order="5" visible="true" weight="0.69602495" />
+      <window_info active="true" anchor="bottom" id="Run" order="5" visible="true" weight="0.41465315" />
       <window_info anchor="bottom" id="Terminal" order="6" weight="0.79111457" />
       <window_info anchor="bottom" id="Debug" order="7" weight="0.5775526" />
       <window_info anchor="bottom" id="Cvs" order="8" weight="0.25" />
@@ -332,7 +329,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/mcts.py</url>
-          <line>107</line>
+          <line>132</line>
           <option name="timeStamp" value="74" />
         </line-breakpoint>
       </breakpoints>
@@ -620,8 +617,25 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/minimaxAgent.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state>
+        <state relative-caret-position="-765">
           <caret column="11" selection-start-column="11" selection-end-column="11" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/createNNModelFile.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="85">
+          <caret line="5" column="33" selection-start-line="5" selection-start-column="33" selection-end-line="5" selection-end-column="33" />
+          <folding>
+            <element signature="e#0#10#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/resNN.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="68">
+          <caret line="7" column="25" selection-start-line="7" selection-start-column="23" selection-end-line="7" selection-end-column="34" />
         </state>
       </provider>
     </entry>
@@ -637,28 +651,18 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/mcts.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="165">
-          <caret line="10" column="24" selection-start-line="10" selection-start-column="24" selection-end-line="10" selection-end-column="24" />
+        <state relative-caret-position="340">
+          <caret line="44" column="91" selection-start-line="44" selection-start-column="91" selection-end-line="44" selection-end-column="91" />
           <folding>
             <element signature="e#0#14#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/createNNModelFile.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="170">
-          <caret line="10" column="30" selection-start-line="10" selection-start-column="30" selection-end-line="10" selection-end-column="30" />
-          <folding>
-            <element signature="e#0#10#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/TDAgent.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="199">
-          <caret line="110" column="121" selection-start-line="110" selection-start-column="121" selection-end-line="110" selection-end-column="121" />
+        <state relative-caret-position="203">
+          <caret line="210" column="141" selection-start-line="210" selection-start-column="141" selection-end-line="210" selection-end-column="141" />
           <folding>
             <element signature="e#0#23#0" expanded="true" />
           </folding>
@@ -667,18 +671,11 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/checkersTrainer.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="70">
-          <caret line="45" column="22" selection-start-line="45" selection-start-column="22" selection-end-line="45" selection-end-column="22" />
+        <state relative-caret-position="60">
+          <caret line="55" column="23" selection-start-line="55" selection-start-column="23" selection-end-line="55" selection-end-column="23" />
           <folding>
             <element signature="e#0#29#0" expanded="true" />
           </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/resNN.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="68">
-          <caret line="7" column="25" selection-start-line="7" selection-start-column="23" selection-end-line="7" selection-end-column="34" />
         </state>
       </provider>
     </entry>
