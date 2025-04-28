@@ -132,11 +132,14 @@ class MinimaxAgent:
             score += 1 + (1.25 * king)
             if king == 1:
                 total_dist = 0
-                for opp_pos, _ in board.get_players_pieces(-self.player).items():
-                    total_dist += self.manhatten_distance(pos, opp_pos) * 0.05
-                mean_dist = total_dist / num_opp_pieces
-                max_dist = max(max_dist, mean_dist)
-                min_dist = min(min_dist, mean_dist)
+                # Check if opponent has pieces before calculating distance
+                if num_opp_pieces > 0:
+                    for opp_pos, _ in board.get_players_pieces(-self.player).items():
+                        total_dist += self.manhatten_distance(pos, opp_pos) * 0.05
+                    mean_dist = total_dist / num_opp_pieces
+                    max_dist = max(max_dist, mean_dist)
+                    min_dist = min(min_dist, mean_dist)
+                # else: If no opponent pieces, max_dist/min_dist remain 0, which seems reasonable.
         if num_pieces > num_opp_pieces:
             score -= max_dist
             opp_piece_val = 1.1
