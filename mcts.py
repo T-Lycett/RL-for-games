@@ -101,6 +101,7 @@ class MCTS:
 
             # Periodically check for KL-divergence convergence.
             if self.mcts_sims % 25 == 0:
+                # print(f"[MCTS Debug] Check KL divergence at sim {self.mcts_sims}") # DEBUG
                 new_probs = np.zeros(checkersBoard.CheckersBoard.action_size)
                 counts = np.zeros(checkersBoard.CheckersBoard.action_size)
                 q_values = np.zeros(checkersBoard.CheckersBoard.action_size)
@@ -120,10 +121,29 @@ class MCTS:
                     new_probs = [x/sum(counts) for x in counts]
                     # Calculate KL divergence if we have a previous distribution.
                     if node_probs is not None:
-                        # Ensure shapes match and avoid log(0)
-                        # KL divergence calculation requires careful handling of zero probabilities.
-                        # scipy.stats.entropy handles this.
-                        self.kl_divergence = stats.entropy(new_probs, node_probs)
+                        # print(f"[MCTS Debug] Calculating KL divergence. Prev Probs Nonzero: {np.count_nonzero(node_probs)}, New Probs Nonzero: {np.count_nonzero(new_probs)}") # DEBUG
+                        # print(f"[MCTS Debug] Prev Probs: {node_probs}") # DEBUG
+                        # print(f"[MCTS Debug] New Probs: {new_probs}") # DEBUG
+                        try:
+                            # Ensure inputs are valid for entropy (non-negative, sum to 1 ideally)
+                            # Scipy usually handles near-zero values, but let's be cautious
+                            clean_new_probs = np.maximum(new_probs, 0) # Ensure non-negative
+                            clean_node_probs = np.maximum(node_probs, 0)
+                            sum_new = np.sum(clean_new_probs)
+                            sum_old = np.sum(clean_node_probs)
+                            if sum_new > 1e-6 and sum_old > 1e-6: # Only calculate if sums are valid
+                                 clean_new_probs /= sum_new
+                                 clean_node_probs /= sum_old
+                                 self.kl_divergence = stats.entropy(clean_new_probs, clean_node_probs)
+                                 # print(f"[MCTS Debug] Calculated KL: {self.kl_divergence}") # DEBUG
+                            else:
+                                 self.kl_divergence = math.inf # Assign inf if probs are invalid
+                                 # print(f"[MCTS Debug] Invalid probs for KL calc (sums: new={sum_new}, old={sum_old}), setting KL=inf") # DEBUG
+                        except Exception as e:
+                            print(f"[MCTS Error] Exception during KL divergence calculation: {e}")
+                            print(f"[MCTS Error] new_probs: {new_probs}")
+                            print(f"[MCTS Error] node_probs: {node_probs}")
+                            self.kl_divergence = math.inf # Assign inf on error
                     # Update the stored probability distribution.
                     node_probs = new_probs
 
@@ -207,6 +227,8 @@ class MCTS:
         self.max_depth = max(self.max_depth, depth)
         depth = depth + 1
 
+        # print(f"[MCTS Debug] Enter search: depth={depth}, player={board.current_player}, state={TDAgent.extract_features(board, board.current_player).tobytes()[:10]}...") # DEBUG
+
         current_player = board.current_player
         state = TDAgent.extract_features(board, current_player).tobytes()
         if state not in self.Ns:
@@ -251,10 +273,32 @@ class MCTS:
             # Evaluate the current board state using the neural network.
             features = TDAgent.extract_features(board, current_player)
             features = np.asarray([features])
+            # print(f"[MCTS Debug] Expanding node at depth {depth}. Calling NN predict.") # DEBUG
+            nn_output = None
+            try:
+                nn_output = self.nnet_model.predict(features)
+                # print(f"[MCTS Debug] NN predict output: {nn_output}") # DEBUG
+            except Exception as e:
+                print(f"[MCTS Error] Exception during NN prediction: {e}")
+                # Decide how to handle NN error - maybe return neutral value?
+                v = 0.0
+                pi = np.ones_like(valids) * valids # Uniform policy over valid moves
+                sum_pi = np.sum(pi)
+                if sum_pi > 0: pi /= sum_pi
+                self.Ps[state] = pi
+                self.Qs[state] = v
+                self.v_lower_bound[state] = v
+                self.v_upper_bound[state] = v
+                return
+
             if self.use_policy_head:
-                v, pi = self.nnet_model.predict(features)
-                v = v[0][0] # NN value prediction (scalar)
-                pi = pi[0] # NN policy prediction (vector)
+                v, pi = nn_output # Assuming output is [value, policy]
+                # v = v[0][0] # NN value prediction (scalar)
+                # pi = pi[0] # NN policy prediction (vector)
+                # Handle potential nested lists/arrays if prediction format is unusual
+                v = v[0][0] if isinstance(v, (list, np.ndarray)) and len(v)>0 and isinstance(v[0], (list, np.ndarray)) else (v[0] if isinstance(v, (list, np.ndarray)) else v)
+                pi = pi[0] if isinstance(pi, (list, np.ndarray)) and len(pi)>0 and isinstance(pi[0], (list, np.ndarray)) else pi
+
                 if sum(valids) == 0:
                     # Should not happen if game_ended() is correct.
                     print('Error: No valid moves found during expansion for player {current_player}.')
@@ -275,7 +319,8 @@ class MCTS:
                     self.Ps[state] = pi # Store the policy priors.
             else:
                 # If not using policy head, only get the value prediction.
-                prediction = self.nnet_model.predict(features)
+                # prediction = self.nnet_model.predict(features) # Already predicted
+                prediction = nn_output
                 v = prediction[0] if isinstance(prediction, (list, np.ndarray)) and len(prediction) > 0 else prediction # Handle potential list output
                 v = v[0] if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v # Extract scalar
                 # Use uniform priors implicitly during selection if Ps[state] is missing.
@@ -385,6 +430,7 @@ class MCTS:
 
         # Increment visit count for the current state AFTER the recursive call and updates.
         self.Ns[state] += 1
+        # print(f"[MCTS Debug] Exit search: depth={depth}") # DEBUG
         return
 
     def terminate_search(self):
