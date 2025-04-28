@@ -212,12 +212,28 @@ class TDAgent():
             choices = np.ndarray(checkersBoard.CheckersBoard.action_size, dtype=checkersBoard.CheckersBoard)
             for move, i in moves:
                 choices[int(i)] = move
-            move = choices[weighted_pick(exponentiated_probs)]
+                
+            # Ensure probabilities are valid for weighted picking
+            if np.sum(exponentiated_probs) < 1e-10 or np.isnan(exponentiated_probs).any():
+                print("Warning: Invalid probability distribution. Using uniform selection.")
+                valid_indices = [int(i) for _, i in moves]
+                selected_index = random.choice(valid_indices)
+                move = choices[selected_index]
+            else:
+                try:
+                    move = choices[weighted_pick(exponentiated_probs)]
+                except Exception as e:
+                    print(f"Error during move selection: {e}")
+                    # Fallback to first move
+                    move = moves[0][0]
 
             current_state = self.extract_features(board, board.current_player).tobytes()
             move_state = self.extract_features(move, move.current_player).tobytes()
             nn_val = self.evaluate(move, move.current_player)[0]
-            mcts_val = mcts_instance.Qs[(current_state)]
+            
+            # Safely access MCTS Q-values
+            mcts_val = mcts_instance.Qs.get(current_state, "Unknown")
+            
             if player != move.current_player:
                 nn_val *= -1
             eval_str = 'Neural Network: ' + str(nn_val) + ', MCTS: ' + str(mcts_val)
