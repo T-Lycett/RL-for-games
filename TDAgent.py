@@ -77,75 +77,169 @@ def self_play_init(l, val):
 
 
 def self_play_game_player(model_filename, kld_threshold, q_learning):
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-    sess = tf.Session(config=config)
-    keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
-    model = keras.models.load_model(model_filename)
-    max_moves_until_t0 = 30
-    training_examples = []
-    games = 0
-    game_id = -1
-    while True:
-        with self_play_lock:
-            print('games left: ' + str(games_to_play.value))
-            if games_to_play.value == 0:
-                break
-            else:
-                games_to_play.value -= 1
-                game_id = games_to_play.value
-                print('started game ' + str(game_id))
-        mcts_instance = mcts.MCTS(model, use_policy_head=not q_learning)
-        games += 1
-        move_history = []
-        game_ended = False
-        board = checkersBoard.CheckersBoard(start_positions=True)
-        current_player = 1
-        # state = extract_features(board, current_player)
-        # move_history.append([state, False, None, None])
-        num_moves = 0
-        moves_until_t0 = math.inf # random.randint(1, max_moves_until_t0)
-        num_mcts_sims = []
-        while not game_ended:
-            if num_moves < moves_until_t0:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=0.2)
-            else:
-                move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0.05)
-            state = extract_features(board, current_player)
-            assert not np.all(np.isnan(probs))
-            move_history.append([state, current_player, None, probs])
-            if mcts_instance.mcts_sims != 0:
-                num_mcts_sims.append(mcts_instance.mcts_sims)
-            if sum(probs) > 1.01:
-                print('error: sum of probabilities is more than 1: ' + str(sum(probs)))
-            elif sum(probs) < 0.99:
-                print('error: sum of probabilities is less than 1: ' + str(sum(probs)))
-            board.set_positions(move)
-            game_ended, winner = board.game_ended()
-            current_player = board.current_player
-            num_moves += 1
-            # if num_moves % update_frequency == 0 or game_ended:
-            if game_ended:
+    try:
+        # Set up TensorFlow session with error handling
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+        
+        # Handle potential TensorFlow session creation errors
+        try:
+            sess = tf.Session(config=config)
+            keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
+        except Exception as e:
+            print(f"ERROR creating TensorFlow session: {e}")
+            import traceback
+            traceback.print_exc()
+            return []  # Return empty training examples on session error
+            
+        # Handle potential model loading errors
+        try:
+            model = keras.models.load_model(model_filename)
+        except Exception as e:
+            print(f"ERROR loading model '{model_filename}': {e}")
+            import traceback
+            traceback.print_exc()
+            return []  # Return empty training examples on model loading error
+            
+        max_moves_until_t0 = 30
+        training_examples = []
+        games = 0
+        game_id = -1
+        
+        while True:
+            try:
+                with self_play_lock:
+                    print('games left: ' + str(games_to_play.value))
+                    if games_to_play.value == 0:
+                        break
+                    else:
+                        games_to_play.value -= 1
+                        game_id = games_to_play.value
+                        print('started game ' + str(game_id))
+                        
+                mcts_instance = mcts.MCTS(model, use_policy_head=not q_learning)
+                games += 1
+                move_history = []
+                game_ended = False
+                board = checkersBoard.CheckersBoard(start_positions=True)
+                current_player = 1
+                # state = extract_features(board, current_player)
+                # move_history.append([state, False, None, None])
+                num_moves = 0
+                moves_until_t0 = math.inf # random.randint(1, max_moves_until_t0)
+                num_mcts_sims = []
+                max_moves = 200  # Safety limit to prevent infinite games
+                
+                while not game_ended and num_moves < max_moves:
+                    try:
+                        if num_moves < moves_until_t0:
+                            move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=0.2)
+                        else:
+                            move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0.05)
+                            
+                        if move is None or np.all(np.isnan(probs)):
+                            print(f"ERROR in game {game_id}: Invalid move or probabilities. Ending game.")
+                            game_ended = True
+                            break
+                            
+                        state = extract_features(board, current_player)
+                        
+                        # Validate returned probabilities
+                        if np.any(np.isnan(probs)):
+                            print(f"WARNING in game {game_id}: NaN values in probabilities")
+                            probs = np.nan_to_num(probs, nan=0.0)
+                            if np.sum(probs) < 1e-10:
+                                # If sum is too small after removing NaNs, use uniform
+                                num_valid = np.count_nonzero(probs > 0)
+                                if num_valid > 0:
+                                    probs[probs > 0] = 1.0 / num_valid
+                                else:
+                                    probs = np.ones_like(probs) / len(probs)
+                                    
+                        # Ensure probabilities sum to 1 (approximately)
+                        if abs(np.sum(probs) - 1.0) > 0.01:
+                            if np.sum(probs) > 0:
+                                probs = probs / np.sum(probs)
+                            else:
+                                probs = np.ones_like(probs) / len(probs)
+                        
+                        move_history.append([state, current_player, None, probs])
+                        
+                        if mcts_instance.mcts_sims != 0:
+                            num_mcts_sims.append(mcts_instance.mcts_sims)
+                            
+                        # Apply the move
+                        board.set_positions(move)
+                        game_ended, winner = board.game_ended()
+                        current_player = board.current_player
+                        num_moves += 1
+                        
+                    except Exception as e:
+                        print(f"ERROR in game {game_id}, move {num_moves}: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # Try to recover and continue or end the game
+                        game_ended = True
+                        winner = 0  # Draw on error
+                
+                # Game ended - handle the result    
+                if num_moves >= max_moves:
+                    print(f"WARNING: Game {game_id} reached move limit. Ending as draw.")
+                    winner = 0
+                
+                # Finalize game history
                 if winner == 1:
                     winner_str = 'player 1'
                 elif winner == -1:
                     winner_str = 'player 2'
                 else:
                     winner_str = 'draw'
-                print('finished game ' + str(game_id) + ', temp = 0 at move ' + str(moves_until_t0) + ', game length: ' + str(num_moves) +
-                      ', average mcts sims: ' + str(sum(num_mcts_sims) / len(num_mcts_sims)) + ', max mcts sims: ' +
-                      str(max(num_mcts_sims)) + ', min mcts sims: ' + str(min(num_mcts_sims)) + ', winner: ' + winner_str)
-                state = extract_features(board, current_player)
-                if not q_learning:
-                    assert not np.all(np.isnan(probs))
-                move_history.append([state, current_player, None, probs])
-                for i, (_, cur_player, r, _) in enumerate(move_history):
-                    move_history[i][2] = cur_player * winner
-                for m in move_history:
-                    training_examples.append(m)
-    keras.backend.clear_session()
-    del model
-    return training_examples
+                    
+                avg_mcts_sims = sum(num_mcts_sims) / len(num_mcts_sims) if num_mcts_sims else 0
+                max_mcts_sims = max(num_mcts_sims) if num_mcts_sims else 0
+                min_mcts_sims = min(num_mcts_sims) if num_mcts_sims else 0
+                
+                print(f'finished game {game_id}, temp = 0 at move {moves_until_t0}, game length: {num_moves}, ' +
+                      f'average mcts sims: {avg_mcts_sims}, max mcts sims: {max_mcts_sims}, ' +
+                      f'min mcts sims: {min_mcts_sims}, winner: {winner_str}')
+                
+                # Record final state if needed
+                if not move_history:
+                    # Game ended with no moves - skip
+                    continue
+                    
+                # Add final result to all states in history
+                try:
+                    for i, (_, cur_player, r, _) in enumerate(move_history):
+                        move_history[i][2] = cur_player * winner
+                        
+                    for m in move_history:
+                        training_examples.append(m)
+                except Exception as e:
+                    print(f"ERROR finalizing game {game_id} history: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    
+            except Exception as e:
+                print(f"CRITICAL ERROR in game {game_id}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue  # Try to process next game
+                
+        # Clean up
+        try:
+            keras.backend.clear_session()
+            del model
+        except Exception as e:
+            print(f"ERROR cleaning up resources: {e}")
+        
+        return training_examples
+        
+    except Exception as e:
+        print(f"FATAL ERROR in self_play_game_player: {e}")
+        import traceback
+        traceback.print_exc()
+        return []  # Return empty list on fatal error
 
 
 class TDAgent():
@@ -267,50 +361,141 @@ class TDAgent():
     def self_play(self, kld_threshold, num_games=1000, iterations=1, lambda_val=0.9, batch_size=1024):
         if not self.learner:
             return False
+            
         for iteration in range(iterations):
             print('iteration: ' + str(iteration))
             games_left_to_play = Value('i', num_games)
-            # self.evaluation_queue = multiprocessing.Manager().Queue()
-            # self.evaluated_positions = [multiprocessing.Manager().dict() for _ in range(self.game_players)]
-            # self.pos_eval_worker = multiprocessing.Process(target=self.position_evaluator, args=(self.evaluation_queue, self.evaluated_positions, self.model_filename))
-            # self.pos_eval_worker.start()
-            keras.backend.clear_session()
-            if self.NN is not None:
-                del self.NN
-                self.NN = None
+            
+            # Clean up existing model/session before multiprocessing
+            try:
+                keras.backend.clear_session()
+                if self.NN is not None:
+                    del self.NN
+                    self.NN = None
+                print("Successfully cleared previous TensorFlow session and model")
+            except Exception as e:
+                print(f"Warning during session/model cleanup: {e}")
+                
             lock = Lock()
-            game_player_pool = multiprocessing.Pool(processes=self.game_players, initializer=self_play_init, initargs=(lock, games_left_to_play,))
-            results = [game_player_pool.apply_async(self_play_game_player, args=(self.model_filename, kld_threshold, self.q_learning)) for p in range(self.game_players)]
-            game_player_pool.close()
-            game_player_pool.join()
-            self_play_results = [r.get() for r in results]
+            game_player_pool = None
+            results = []
+            
+            try:
+                # Create the process pool
+                game_player_pool = multiprocessing.Pool(
+                    processes=self.game_players, 
+                    initializer=self_play_init, 
+                    initargs=(lock, games_left_to_play,)
+                )
+                
+                # Apply the game player function asynchronously
+                results = [
+                    game_player_pool.apply_async(
+                        self_play_game_player, 
+                        args=(self.model_filename, kld_threshold, self.q_learning)
+                    ) for _ in range(self.game_players)
+                ]
+                
+                # Set a timeout for getting results (30 minutes per worker)
+                timeout_per_worker = 1800  
+                game_player_pool.close()
+                
+                # Safely collect results with timeout
+                self_play_results = []
+                for i, r in enumerate(results):
+                    try:
+                        result = r.get(timeout=timeout_per_worker)
+                        self_play_results.append(result)
+                    except multiprocessing.TimeoutError:
+                        print(f"Worker {i} timed out after {timeout_per_worker} seconds")
+                    except Exception as e:
+                        print(f"Error getting results from worker {i}: {e}")
+                        import traceback
+                        traceback.print_exc()
+                
+            except Exception as e:
+                print(f"Critical error in self_play multiprocessing: {e}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                # Ensure pool is properly cleaned up
+                if game_player_pool:
+                    try:
+                        game_player_pool.terminate()
+                        game_player_pool.join()
+                    except:
+                        print("Error during pool cleanup")
+            
+            # Process the results from successful workers
             for sublist in self_play_results:
+                if not sublist:
+                    print("Warning: Empty result from worker")
+                    continue
+                    
                 for example in sublist:
                     self.training_examples.append(example)
-            # self.training_examples = [item for sublist in self.training_examples for item in sublist]
+            
             print('training examples: ' + str(len(self.training_examples)))
+            
+            # Train the model if we have enough examples
             if len(self.training_examples) > batch_size:
-                config = tf.ConfigProto()
-                config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-                self.sess = tf.Session(config=config)
-                keras.backend.set_session(self.sess)  # set this TensorFlow session as the default session for Keras
-                self.NN = keras.models.load_model(self.model_filename)
-                # self.NN.compile(keras.optimizers.Adam(lr=self.lr), loss=tf.losses.mean_squared_error)
-                # self.pos_eval_worker.close()
-                self.training_examples = self.deduplicate_training_data(self.training_examples)
-                shuffle(self.training_examples)
-                while len(self.training_examples) > batch_size:
+                try:
+                    # Set up TensorFlow for training
+                    config = tf.ConfigProto()
+                    config.gpu_options.allow_growth = True
+                    self.sess = tf.Session(config=config)
+                    keras.backend.set_session(self.sess)
+                    
+                    # Load the model for training
                     try:
-                        self.update_model(self.training_examples[-batch_size:], lambda_val, batch_size)
-                        self.training_examples[-batch_size:] = []
-                    except:
-                        print('possible gpu error')
-                self.save_model(self.model_filename)
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-        self.sess = tf.Session(config=config)
-        keras.backend.set_session(self.sess)  # set this TensorFlow session as the default session for Keras
-        self.NN = keras.models.load_model(self.model_filename)
+                        self.NN = keras.models.load_model(self.model_filename)
+                        print(f"Successfully loaded model from {self.model_filename}")
+                    except Exception as e:
+                        print(f"Error loading model for training: {e}")
+                        continue  # Skip this iteration if we can't load the model
+                    
+                    # Deduplicate and shuffle training data
+                    self.training_examples = self.deduplicate_training_data(self.training_examples)
+                    shuffle(self.training_examples)
+                    
+                    # Train in batches
+                    training_batches = 0
+                    while len(self.training_examples) > batch_size:
+                        try:
+                            batch = self.training_examples[-batch_size:]
+                            self.update_model(batch, lambda_val, batch_size)
+                            self.training_examples[-batch_size:] = []
+                            training_batches += 1
+                            
+                            # Save after each few batches as checkpoint
+                            if training_batches % 5 == 0:
+                                self.save_model(self.model_filename)
+                                
+                        except Exception as e:
+                            print(f"Error during model update: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            break  # Exit training loop on error
+                    
+                    # Final save
+                    self.save_model(self.model_filename)
+                    
+                except Exception as e:
+                    print(f"Critical error during training: {e}")
+                    import traceback
+                    traceback.print_exc()
+        
+        # Reload the model after training
+        try:
+            config = tf.ConfigProto()
+            config.gpu_options.allow_growth = True
+            self.sess = tf.Session(config=config)
+            keras.backend.set_session(self.sess)
+            self.NN = keras.models.load_model(self.model_filename)
+        except Exception as e:
+            print(f"Error reloading model after training: {e}")
+            import traceback
+            traceback.print_exc()
 
     def calculate_kld_threshold(self, current_threshold, average_game_length):
         target_game_length = 125
