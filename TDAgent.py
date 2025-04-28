@@ -3,7 +3,7 @@ import numpy as np
 import math
 import random
 from random import shuffle
-import cnn
+import torch
 import resNN
 import multiprocessing
 import threading
@@ -19,8 +19,11 @@ board_width = checkersBoard.CheckersBoard.board_width
 
 def evaluate(model, board, current_player):
     features = extract_features(board, current_player)
-    features = np.asarray([features])
-    return model.predict(features)
+    features = torch.from_numpy(features).float().unsqueeze(0)
+    device = next(model.parameters()).device
+    features = features.to(device)
+    with torch.no_grad():
+        return model(features)[0].cpu().numpy()
 
 
 def flip_pieces(pieces):
@@ -68,32 +71,36 @@ def get_move(board, player, mcts_instance, kld_threshold, temperature, max_sims=
         return chosen_move, node_probs
 
 
-def self_play_init(l, val):
+def self_play_init(l, val, width, res_blocks, q_learning_only):
     global self_play_lock
     self_play_lock = l
     global games_to_play
     games_to_play = val
+    global model_width
+    model_width = width
+    global model_res_blocks
+    model_res_blocks = res_blocks
+    global model_q_learning_only
+    model_q_learning_only = q_learning_only
 
 
 def self_play_game_player(model_filename, kld_threshold, q_learning):
     try:
-        # Set up TensorFlow session with error handling
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+        # Create and load a PyTorch model
+        device = torch.device("cpu")  # Worker processes usually use CPU
         
-        # Handle potential TensorFlow session creation errors
+        # Get model parameters from global variables (passed during initialization)
+        width = model_width if 'model_width' in globals() else 64  # Default width=64
+        residual_blocks = model_res_blocks if 'model_res_blocks' in globals() else 3  # Default blocks=3
+        q_learning_only = model_q_learning_only if 'model_q_learning_only' in globals() else q_learning  # Default based on input param
+        
+        # Initialize model with the right parameters
+        model = resNN.ResNN(width=width, residual_blocks=residual_blocks, q_learning_only=q_learning_only)
+        
         try:
-            sess = tf.Session(config=config)
-            keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
-        except Exception as e:
-            print(f"ERROR creating TensorFlow session: {e}")
-            import traceback
-            traceback.print_exc()
-            return []  # Return empty training examples on session error
-            
-        # Handle potential model loading errors
-        try:
-            model = keras.models.load_model(model_filename)
+            model.load_state_dict(torch.load(model_filename, map_location=device))
+            model.to(device)
+            model.eval()  # Set to evaluation mode
         except Exception as e:
             print(f"ERROR loading model '{model_filename}': {e}")
             import traceback
@@ -227,7 +234,6 @@ def self_play_game_player(model_filename, kld_threshold, q_learning):
                 
         # Clean up
         try:
-            keras.backend.clear_session()
             del model
         except Exception as e:
             print(f"ERROR cleaning up resources: {e}")
@@ -248,24 +254,39 @@ class TDAgent():
         self.lr = lr
         self.search_depth = search_depth
         self.training_examples = []
-        # self.NN = resNN.ResNN()
         self.model_filename = model_filename
-        # self.NN = cnn.CNN()
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-        self.sess = tf.Session(config=config)
-        keras.backend.set_session(self.sess)  # set this TensorFlow session as the default session for Keras
-        self.NN = keras.models.load_model(model_filename)
-        # self.NN.compile(keras.optimizers.Adam(lr=lr), loss=tf.losses.mean_squared_error)
+        
+        # Model architecture parameters
+        self.width = 64  # Default width
+        self.residual_blocks = 3  # Default blocks
+        
+        # Set up device for PyTorch
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {self.device}")
+        
+        # Initialize the PyTorch model
+        self.NN = resNN.ResNN(width=self.width, residual_blocks=self.residual_blocks, q_learning_only=q_learning)
+        
+        try:
+            self.NN.load_state_dict(torch.load(model_filename, map_location=self.device))
+            print(f"Successfully loaded model from {model_filename}")
+        except Exception as e:
+            print(f"Error loading model: {e}. Will initialize a new model.")
+            # If loading fails, we'll just keep the newly initialized model
+            
+        self.NN.to(self.device)
+        self.NN.eval()  # Start in evaluation mode
+        
+        # Initialize optimizer
+        self.optimizer = torch.optim.Adam(self.NN.parameters(), lr=lr)
+            
         if self.learner:
             self.game_players = 4  # int(multiprocessing.cpu_count() / 2)
 
     def set_lr(self, lr):
         self.lr = lr
-        if self.q_learning:
-            self.NN.compile(keras.optimizers.Adam(lr=lr), loss=keras.losses.mean_squared_error)
-        else:
-            self.NN.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
+        # Update the optimizer with the new learning rate
+        self.optimizer = torch.optim.Adam(self.NN.parameters(), lr=lr)
         print('set learning rate to ' + str(lr))
         self.save_model(self.model_filename)
 
@@ -341,22 +362,72 @@ class TDAgent():
             losses.append([state, reward, probs])
         states, targets, probs = list(zip(*losses))
         assert not np.all(np.isnan(probs))
+        
+        # Convert data to PyTorch tensors
         states = np.asarray(states)
         targets = np.asarray(targets)
-        if states.shape[1:] != (board_height, board_width, 5):
-            print(f"Warning: Unexpected state shape before fit: {states.shape}. Expected ({batch_size}, {board_height}, {board_width}, 5)")
+        
+        # Ensure proper shape
+        if states.shape[1:] != (5, board_height, board_width):  # channels_first format
+            print(f"Warning: Unexpected state shape: {states.shape}. Expected ({batch_size}, 5, {board_height}, {board_width})")
             try:
-                states = states.reshape((batch_size, board_height, board_width, 5))
+                # Reshape to (batch_size, channels, height, width)
+                states = states.reshape((batch_size, 5, board_height, board_width))
                 print(f"Reshaped states to: {states.shape}")
             except ValueError as e:
                 print(f"Error reshaping states: {e}. Check feature extraction and batch assembly.")
                 raise e
-        targets = np.reshape(targets, (-1))
+                
+        # Convert to PyTorch tensors and move to device
+        states_tensor = torch.from_numpy(states).float().to(self.device)
+        targets_tensor = torch.from_numpy(targets).float().to(self.device)
+        
+        # Set model to training mode
+        self.NN.train()
+        
+        # Training loop
+        self.optimizer.zero_grad()
+        
         if self.q_learning:
-            self.NN.fit(states, [targets], batch_size=batch_size, epochs=1)
+            # Only predict and train on value
+            pred_value = self.NN(states_tensor)
+            if isinstance(pred_value, tuple):
+                pred_value = pred_value[0]  # Extract value if model returns (value, policy)
+            
+            # Define loss function
+            value_loss_fn = torch.nn.MSELoss()
+            loss = value_loss_fn(pred_value.squeeze(), targets_tensor)
         else:
+            # Predict both value and policy
             probs = np.reshape(probs, (batch_size, checkersBoard.CheckersBoard.action_size))
-            self.NN.fit(states, [targets, probs], batch_size=batch_size, epochs=1)
+            probs_tensor = torch.from_numpy(probs).float().to(self.device)
+            
+            pred_value, pred_probs = self.NN(states_tensor)
+            
+            # Define loss functions
+            value_loss_fn = torch.nn.MSELoss()
+            policy_loss_fn = torch.nn.CrossEntropyLoss() if pred_probs.shape[1:] == probs_tensor.shape[1:] else torch.nn.KLDivLoss(reduction='batchmean')
+            
+            # Calculate losses
+            value_loss = value_loss_fn(pred_value.squeeze(), targets_tensor)
+            
+            # For policy loss, check if we need log_softmax
+            if isinstance(policy_loss_fn, torch.nn.KLDivLoss):
+                pred_probs = torch.nn.functional.log_softmax(pred_probs, dim=1)
+                policy_loss = policy_loss_fn(pred_probs, probs_tensor)
+            else:
+                policy_loss = policy_loss_fn(pred_probs, probs_tensor)
+                
+            loss = value_loss + policy_loss
+        
+        # Backpropagation and optimization
+        loss.backward()
+        self.optimizer.step()
+        
+        # Set model back to evaluation mode
+        self.NN.eval()
+        
+        print(f"Training loss: {loss.item()}")
 
     def self_play(self, kld_threshold, num_games=1000, iterations=1, lambda_val=0.9, batch_size=1024):
         if not self.learner:
@@ -366,26 +437,26 @@ class TDAgent():
             print('iteration: ' + str(iteration))
             games_left_to_play = Value('i', num_games)
             
-            # Clean up existing model/session before multiprocessing
+            # Clean up existing model before multiprocessing
             try:
-                keras.backend.clear_session()
-                if self.NN is not None:
-                    del self.NN
-                    self.NN = None
-                print("Successfully cleared previous TensorFlow session and model")
+                # PyTorch doesn't need explicit session cleanup like TensorFlow
+                self.NN.cpu()  # Move model to CPU before multiprocessing
+                model_copy = self.NN.state_dict()  # Make a copy of the state dict
+                self.save_model(self.model_filename)  # Save the model for workers to load
+                print("Successfully prepared model for worker processes")
             except Exception as e:
-                print(f"Warning during session/model cleanup: {e}")
+                print(f"Warning during model preparation: {e}")
                 
             lock = Lock()
             game_player_pool = None
             results = []
             
             try:
-                # Create the process pool
+                # Create the process pool with model parameters
                 game_player_pool = multiprocessing.Pool(
                     processes=self.game_players, 
                     initializer=self_play_init, 
-                    initargs=(lock, games_left_to_play,)
+                    initargs=(lock, games_left_to_play, self.width, self.residual_blocks, self.q_learning)
                 )
                 
                 # Apply the game player function asynchronously
@@ -440,19 +511,8 @@ class TDAgent():
             # Train the model if we have enough examples
             if len(self.training_examples) > batch_size:
                 try:
-                    # Set up TensorFlow for training
-                    config = tf.ConfigProto()
-                    config.gpu_options.allow_growth = True
-                    self.sess = tf.Session(config=config)
-                    keras.backend.set_session(self.sess)
-                    
-                    # Load the model for training
-                    try:
-                        self.NN = keras.models.load_model(self.model_filename)
-                        print(f"Successfully loaded model from {self.model_filename}")
-                    except Exception as e:
-                        print(f"Error loading model for training: {e}")
-                        continue  # Skip this iteration if we can't load the model
+                    # Move model back to the training device
+                    self.NN.to(self.device)
                     
                     # Deduplicate and shuffle training data
                     self.training_examples = self.deduplicate_training_data(self.training_examples)
@@ -485,29 +545,21 @@ class TDAgent():
                     import traceback
                     traceback.print_exc()
         
-        # Reload the model after training
-        try:
-            config = tf.ConfigProto()
-            config.gpu_options.allow_growth = True
-            self.sess = tf.Session(config=config)
-            keras.backend.set_session(self.sess)
-            self.NN = keras.models.load_model(self.model_filename)
-        except Exception as e:
-            print(f"Error reloading model after training: {e}")
-            import traceback
-            traceback.print_exc()
+        # Ensure model is in the right state after training
+        self.NN.to(self.device)
+        self.NN.eval()
 
     def calculate_kld_threshold(self, current_threshold, average_game_length):
         target_game_length = 125
 
     @staticmethod
     def position_evaluator(evaluation_queue, evaluated_positions, model_filename):
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-        config.log_device_placement = True  # to log device placement (on which device the operation ran)
-        sess = tf.Session(config=config)
-        keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
-        model = keras.models.load_model(model_filename)
+        device = torch.device("cpu")  # Worker process typically uses CPU
+        model = resNN.ResNN()  # Initialize with proper parameters
+        model.load_state_dict(torch.load(model_filename, map_location=device))
+        model.to(device)
+        model.eval()
+        
         while True:
             board, player, p_id = evaluation_queue.get()
             TDAgent.evaluate_position(model, board, player, evaluated_positions[p_id])
@@ -515,8 +567,17 @@ class TDAgent():
     @staticmethod
     def evaluate_position(model, board, current_player, evaluated_positions):
         features = TDAgent.extract_features(board, current_player)
-        features = np.asarray([features])
-        evaluated_positions[features.tobytes()] = model.predict(features)
+        features_tensor = torch.from_numpy(features).float().unsqueeze(0)
+        device = next(model.parameters()).device
+        features_tensor = features_tensor.to(device)
+        
+        with torch.no_grad():
+            prediction = model(features_tensor)
+            # Handle potential tuple return (value, policy)
+            if isinstance(prediction, tuple):
+                prediction = prediction[0]
+            # Convert back to numpy for storage
+            evaluated_positions[features.tobytes()] = prediction.cpu().numpy()
 
     @staticmethod
     def deduplicate_training_data(training_data):
@@ -539,19 +600,22 @@ class TDAgent():
 
     def evaluate(self, board, current_player):
         features = extract_features(board, current_player)
-        features = np.asarray([features])
-        return self.NN.predict(features)
-
-    def load_weights(self, filepath):
-        self.NN.load_weights(filepath)
-
-    def save_weights(self, filepath):
-        self.NN.save_weights(filepath)
+        features_tensor = torch.from_numpy(features).float().unsqueeze(0).to(self.device)
+        
+        self.NN.eval()  # Ensure model is in evaluation mode
+        with torch.no_grad():
+            prediction = self.NN(features_tensor)
+            # Handle potential tuple return (value, policy)
+            if isinstance(prediction, tuple):
+                prediction = prediction[0]
+            return prediction.cpu().numpy()
 
     def save_model(self, filepath):
-        self.NN.save(filepath)
+        torch.save(self.NN.state_dict(), filepath)
         print('neural network model saved to ' + self.model_filename)
 
     def load_model(self, filepath):
         self.model_filename = filepath
-        self.NN.load_model(filepath)
+        self.NN.load_state_dict(torch.load(filepath, map_location=self.device))
+        self.NN.to(self.device)
+        self.NN.eval()

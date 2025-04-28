@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from multiprocessing import freeze_support
 import QLearner
 import mcts
+import torch
 
 
 def set_kld_threshold(current_threshold, average_mcts_sims, target_mcts_sims):
@@ -29,8 +30,9 @@ def set_kld_threshold(current_threshold, average_mcts_sims, target_mcts_sims):
 if __name__ == '__main__':
     import os
 
-    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    # We don't need TensorFlow-specific environment variables anymore
+    # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     freeze_support()
 
@@ -58,11 +60,21 @@ if __name__ == '__main__':
             if model_dir and not os.path.exists(model_dir):
                 os.makedirs(model_dir)
                 print(f"Created directory {model_dir} for model file")
+                
+            # You might want to create an initial model here
+            # from resNN import ResNN
+            # model = ResNN()
+            # torch.save(model.state_dict(), model_file)
+            # print(f"Created initial model file {model_file}")
     except Exception as e:
         print(f"Error checking/creating model path: {e}")
     
     # Initialize TDAgent with error handling
     try:
+        # Use device-aware initialization
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {device}")
+        
         TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file, q_learning=q_learning_only)
     except Exception as e:
         print(f"Error initializing TDAgent with model {model_file}: {e}")
@@ -72,8 +84,6 @@ if __name__ == '__main__':
         import sys
         sys.exit(1)
         
-    # TD_agent.load_weights('./weights/res_nn_Model')
-    # TD_agent.load_model('cnn64x2.h5')
     q_learner = QLearner.QLearner()
     start = time.time()
     iterations = 1000
@@ -82,7 +92,7 @@ if __name__ == '__main__':
     epoch_per_iteration = 1
     kld_threshold = 0.00288
     target_average_num_sims = 300
-    calibration_runs = 20
+    calibration_runs = 2
     wins = []
     draws = []
     losses = []

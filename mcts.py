@@ -1,6 +1,7 @@
 import TDAgent
 import math
 import numpy as np
+import torch
 import checkersBoard
 from scipy import stats
 
@@ -26,6 +27,9 @@ class MCTS:
         # Epsilon factor for mixing Dirichlet noise into root priors (used during training).
         self.e = 0.75
         self.nnet_model = nnet_model
+        
+        # Get the device for the neural network
+        self.device = next(nnet_model.parameters()).device
 
         # MCTS Tree storage: Dictionaries keyed by state (bytes representation).
         self.Qs = {}  # Stores Q-values (expected reward) for states.
@@ -275,22 +279,27 @@ class MCTS:
 
             # Evaluate the current board state using the neural network.
             features = TDAgent.extract_features(board, current_player)
-            features = np.asarray([features])
+            features_tensor = torch.from_numpy(features).float().unsqueeze(0).to(self.device)
+            
             # print(f"[MCTS Debug] Expanding node at depth {depth}. Calling NN predict.") # DEBUG
             nn_output = None
             try:
                 # Check for valid features shape before prediction
-                if features.shape[1:] != (checkersBoard.CheckersBoard.board_height, 
-                                         checkersBoard.CheckersBoard.board_width, 5):
-                    print(f"[MCTS Error] Invalid features shape: {features.shape}. Expected (1, 8, 8, 5).")
+                if features.shape != (5, checkersBoard.CheckersBoard.board_height, 
+                                     checkersBoard.CheckersBoard.board_width):
+                    print(f"[MCTS Error] Invalid features shape: {features.shape}. Expected (5, 8, 8).")
                     raise ValueError("Invalid features shape")
                     
                 # Handle potential NaN values in features
                 if np.isnan(features).any():
                     print(f"[MCTS Error] NaN values in features.")
                     features = np.nan_to_num(features, nan=0.0)
-                    
-                nn_output = self.nnet_model.predict(features)
+                    features_tensor = torch.from_numpy(features).float().unsqueeze(0).to(self.device)
+                
+                # Set model to evaluation mode and run inference
+                self.nnet_model.eval()
+                with torch.no_grad():
+                    nn_output = self.nnet_model(features_tensor)
                 # print(f"[MCTS Debug] NN predict output: {nn_output}") # DEBUG
             except Exception as e:
                 print(f"[MCTS Error] Exception during NN prediction: {e}")
@@ -308,12 +317,16 @@ class MCTS:
                 return
 
             if self.use_policy_head:
-                v, pi = nn_output # Assuming output is [value, policy]
-                # v = v[0][0] # NN value prediction (scalar)
-                # pi = pi[0] # NN policy prediction (vector)
-                # Handle potential nested lists/arrays if prediction format is unusual
-                v = v[0][0] if isinstance(v, (list, np.ndarray)) and len(v)>0 and isinstance(v[0], (list, np.ndarray)) else (v[0] if isinstance(v, (list, np.ndarray)) else v)
-                pi = pi[0] if isinstance(pi, (list, np.ndarray)) and len(pi)>0 and isinstance(pi[0], (list, np.ndarray)) else pi
+                # Handle PyTorch model output format which returns a tuple (value, policy)
+                if isinstance(nn_output, tuple):
+                    v, pi = nn_output
+                    # Extract from tensors to numpy
+                    v = v.squeeze().cpu().numpy()
+                    pi = pi.squeeze().cpu().numpy()
+                else:
+                    # If only value is returned
+                    v = nn_output.squeeze().cpu().numpy()
+                    pi = np.zeros(checkersBoard.CheckersBoard.action_size)  # Default to uniform later
 
                 if sum(valids) == 0:
                     # Should not happen if game_ended() is correct.
@@ -335,10 +348,11 @@ class MCTS:
                     self.Ps[state] = pi # Store the policy priors.
             else:
                 # If not using policy head, only get the value prediction.
-                # prediction = self.nnet_model.predict(features) # Already predicted
-                prediction = nn_output
-                v = prediction[0] if isinstance(prediction, (list, np.ndarray)) and len(prediction) > 0 else prediction # Handle potential list output
-                v = v[0] if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v # Extract scalar
+                if isinstance(nn_output, tuple):
+                    v = nn_output[0].squeeze().cpu().numpy()  # Extract value from tuple
+                else:
+                    v = nn_output.squeeze().cpu().numpy()  # Only value was returned
+                
                 # Use uniform priors implicitly during selection if Ps[state] is missing.
                 num_valid = int(np.sum(valids))
                 uniform_prob = 1.0 / num_valid if num_valid > 0 else 0
