@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     freeze_support()
 
-    model_file = 'res64x3.h5'
+    model_file = 'res64x3.pth'
 
     profile = False
     if profile:
@@ -43,7 +43,8 @@ if __name__ == '__main__':
 
     q_learning_only = True
     lr_schedule = {}
-    opponent_depth = 7
+    opponent_depth = 2
+    opponent_depth_increase_interval = 1
     max_opponent_depth = 8
     minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
     
@@ -76,7 +77,9 @@ if __name__ == '__main__':
     q_learner = QLearner.QLearner()
     start = time.time()
     iterations = 1000
+    self_play_games_per_iteration = 100
     test_games = 10
+    epoch_per_iteration = 1
     kld_threshold = 0.00288
     target_average_num_sims = 300
     calibration_runs = 20
@@ -92,7 +95,7 @@ if __name__ == '__main__':
             TD_agent.set_lr(lr_schedule[i])
         print('iteration: ' + str(i))
         if i >= calibration_runs:
-            TD_agent.self_play(kld_threshold, num_games=100, iterations=1)
+            TD_agent.self_play(kld_threshold, num_games=self_play_games_per_iteration, iterations=epoch_per_iteration)
         # TD_agent.save_model(model_file)
         # q_learner.learn(q_file, num_games=1000, iterations=20, opposition_depth=opponent_depth)
         # q_learner.save_q_values(q_file)
@@ -186,7 +189,7 @@ if __name__ == '__main__':
         print('draws: ' + str(draws))
         print('losses: ' + str(losses))
         if losses[int(i)] == 0:
-            opponent_depth += 1
+            opponent_depth += opponent_depth_increase_interval
             opponent_depth = min(max_opponent_depth, opponent_depth)
         print('average time per iteration: ' + str((time.time() - start) / (i + 1)))
     plt.show()
