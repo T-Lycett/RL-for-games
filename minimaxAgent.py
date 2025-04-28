@@ -53,9 +53,22 @@ class MinimaxAgent:
             return board, self.evaluate(board, current_depth + 1)
         actions = board.get_valid_moves(current_player, include_chain_jumps=False)
         shuffle(actions)
+
+        # ---- Check for immediate loss (no valid moves) ----
+        if not actions:
+             # If the current player has no valid moves, it's a loss for them.
+             # Return the current board and a score indicating a loss.
+             # The evaluation should handle the perspective (e.g., very low for max player, very high for min player).
+             # Let's return the result of evaluate, which should handle terminal states.
+             return board, self.evaluate(board, current_depth + 1)
+             # Alternatively, return a fixed high/low score:
+             # loss_score = -math.inf if current_player == self.player else math.inf
+             # return board, loss_score
+        # -----------------------------------------------------
+
         if current_player == self.player:
             best_score = -math.inf
-            best_action_index = -1
+            best_action_index = -1 # Initial value
             for i, a in enumerate(actions):
                 _, score = self.minimax(a, current_depth + 1, alpha, beta)
                 if score > best_score:
@@ -64,10 +77,16 @@ class MinimaxAgent:
                     alpha = best_score
                 if alpha >= beta:
                     break
+            # Ensure best_action_index was updated (should be guaranteed if actions is not empty)
+            if best_action_index == -1:
+                 # This case should theoretically not happen if actions is not empty.
+                 # Maybe log an error and pick the first action as a fallback?
+                 print(f"Warning: best_action_index remained -1 for player {current_player} despite non-empty actions.")
+                 best_action_index = 0 # Fallback to first action
             return actions[best_action_index], best_score
         else:
             best_score = math.inf
-            best_action_index = -1
+            best_action_index = -1 # Initial value
             for i, a in enumerate(actions):
                 _, score = self.minimax(a, current_depth + 1, alpha, beta)
                 if score < best_score:
@@ -76,6 +95,11 @@ class MinimaxAgent:
                     beta = best_score
                 if alpha >= beta:
                     break
+            # Ensure best_action_index was updated (should be guaranteed if actions is not empty)
+            if best_action_index == -1:
+                 # This case should theoretically not happen if actions is not empty.
+                 print(f"Warning: best_action_index remained -1 for player {current_player} despite non-empty actions.")
+                 best_action_index = 0 # Fallback to first action
             return actions[best_action_index], best_score
 
     def evaluate(self, board, num_moves):
