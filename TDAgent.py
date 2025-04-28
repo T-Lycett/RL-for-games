@@ -42,7 +42,7 @@ def extract_features(board, current_player):
         players_kings = flip_pieces(players_kings)
         opp_kings = flip_pieces(opp_kings)
     moves_until_draw = np.zeros((board_height, board_width)) + (50 - board.moves_without_capture) / 50
-    return np.array([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw])
+    return np.stack([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw], axis=-1)
 
 
 def get_move(board, player, mcts_instance, kld_threshold, temperature, max_sims=None):
@@ -188,7 +188,7 @@ class TDAgent():
             players_kings = flip_pieces(players_kings)
             opp_kings = flip_pieces(opp_kings)
         moves_until_draw = np.zeros((board_height, board_width)) + (50 - board.moves_without_capture) / 50
-        return np.array([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw])
+        return np.stack([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw], axis=-1)
 
     @staticmethod
     def flip_pieces(pieces):
@@ -228,13 +228,19 @@ class TDAgent():
         losses = []
         for i, move in enumerate(moves):
             state, _, reward, probs = move
-            state = np.asarray([state])
             losses.append([state, reward, probs])
         states, targets, probs = list(zip(*losses))
         assert not np.all(np.isnan(probs))
         states = np.asarray(states)
         targets = np.asarray(targets)
-        states = np.reshape(states, newshape=(batch_size, 5, board_height, board_width))
+        if states.shape[1:] != (board_height, board_width, 5):
+            print(f"Warning: Unexpected state shape before fit: {states.shape}. Expected ({batch_size}, {board_height}, {board_width}, 5)")
+            try:
+                states = states.reshape((batch_size, board_height, board_width, 5))
+                print(f"Reshaped states to: {states.shape}")
+            except ValueError as e:
+                print(f"Error reshaping states: {e}. Check feature extraction and batch assembly.")
+                raise e
         targets = np.reshape(targets, (-1))
         if self.q_learning:
             self.NN.fit(states, [targets], batch_size=batch_size, epochs=1)

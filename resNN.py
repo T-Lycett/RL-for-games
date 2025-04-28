@@ -7,18 +7,18 @@ import checkersBoard
 class ResNN():
     def __init__(self, lr=0.000001, residual_blocks=2, width=64, q_learning_only=True):
         conv2d = keras.layers.Conv2D
-        self.dformat = 'channels_first'
+        self.dformat = 'channels_last'
         board_height = checkersBoard.CheckersBoard.board_height
         board_width = checkersBoard.CheckersBoard.board_width
 
-        self.board = keras.layers.Input(dtype=tf.float32, shape=[5, board_height, board_width])
-        conv1 = keras.layers.BatchNormalization(axis=1)(
+        self.board = keras.layers.Input(dtype=tf.float32, shape=[board_height, board_width, 5])
+        conv1 = keras.layers.BatchNormalization(axis=-1)(
             conv2d(width, kernel_size=[3, 3], activation=tf.nn.relu, data_format=self.dformat, padding='same', use_bias=False)(
                 self.board))
         res_tower = self.residual_block(conv1, width)
         for _ in range(residual_blocks - 1):
             res_tower = self.residual_block(res_tower, width)
-        conv2 = keras.layers.BatchNormalization(axis=1)(
+        conv2 = keras.layers.BatchNormalization(axis=-1)(
             conv2d(32, kernel_size=(1, 1), activation=tf.nn.relu, data_format=self.dformat, padding='same', use_bias=False)(
                 res_tower))
         conv_flat = keras.layers.Flatten()(conv2)
@@ -26,7 +26,7 @@ class ResNN():
         self.value = keras.layers.Dense(1, activation=tf.nn.tanh)(fc1)
 
         if not q_learning_only:
-            policy = keras.layers.BatchNormalization(axis=1)(conv2d(32, [1, 1], data_format=self.dformat, padding='same', use_bias=False)(res_tower))
+            policy = keras.layers.BatchNormalization(axis=-1)(conv2d(32, [1, 1], data_format=self.dformat, padding='same', use_bias=False)(res_tower))
             policy = keras.layers.Flatten()(policy)
             self.probabilities = keras.layers.Dense(checkersBoard.CheckersBoard.action_size, activation=keras.activations.softmax)(policy)
 
@@ -45,10 +45,10 @@ class ResNN():
         shortcut = input_layer
 
         residual = keras.layers.Conv2D(width, kernel_size=(3, 3), data_format=self.dformat, padding='same', use_bias=False)(input_layer)
-        residual = keras.layers.BatchNormalization(axis=1)(residual)
+        residual = keras.layers.BatchNormalization(axis=-1)(residual)
         residual = keras.layers.ReLU()(residual)
         residual = keras.layers.Conv2D(width, kernel_size=(3, 3), data_format=self.dformat, padding='same', use_bias=False)(residual)
-        residual = keras.layers.BatchNormalization(axis=1)(residual)
+        residual = keras.layers.BatchNormalization(axis=-1)(residual)
         add_shortcut = keras.layers.add([residual, shortcut])
         residual_result = keras.layers.ReLU()(add_shortcut)
 

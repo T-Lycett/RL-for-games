@@ -30,11 +30,11 @@ if __name__ == '__main__':
     import os
 
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     freeze_support()
 
-    model_file = 'res128x5.h5'
+    model_file = 'res64x3.h5'
 
     profile = False
     if profile:
