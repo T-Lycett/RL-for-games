@@ -1,49 +1,70 @@
-import tensorflow as tf
-from tensorflow import keras
+import torch
+import torch.nn as nn
 import checkersBoard
 import numpy as np
 
-class CNN():
-    def __init__(self, lr=0.001):
-        self.lr = lr
-        conv2d = keras.layers.Conv2D
-        dformat = 'channels_first'
-        board_width = checkersBoard.CheckersBoard.board_width
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        # self.lr = lr # Learning rate is handled by the optimizer externally
+        board_height = checkersBoard.CheckersBoard.board_height # Should be 8
+        board_width = checkersBoard.CheckersBoard.board_width # Should be 8
+        in_channels = 5 # Input planes
 
-        self.board = keras.layers.Input(dtype=tf.float32, shape=[5, 8, board_width])
-        conv1 = keras.layers.BatchNormalization(axis=1)(conv2d(128, kernel_size=[3, 3], activation=tf.nn.relu, data_format=dformat, padding='same', use_bias=False)(self.board))
-        conv2 = keras.layers.BatchNormalization(axis=1)(conv2d(128, kernel_size=(3, 3), activation=tf.nn.relu, data_format=dformat, padding='same', use_bias=False)(conv1))
-        conv3 = keras.layers.BatchNormalization(axis=1)(conv2d(128, kernel_size=(3, 3), activation=tf.nn.relu, data_format=dformat, padding='same', use_bias=False)(conv2))
-        conv4 = keras.layers.BatchNormalization(axis=1)(conv2d(1, kernel_size=(1, 1), activation=tf.nn.relu, data_format=dformat, padding='same', use_bias=False)(conv3))
-        # conv3 = keras.layers.BatchNormalization(axis=1)(conv2d(128, kernel_size=(3, 3), activation=tf.nn.relu, data_format=dformat, padding='same', use_bias=False)(conv2))
-        conv_flat = keras.layers.Flatten()(conv4)
-        fc1 = keras.layers.Dense(128, activation=tf.nn.relu)(conv_flat)
-        self.value = keras.layers.Dense(1, activation=tf.nn.tanh)(fc1)
+        self.conv1 = nn.Conv2d(in_channels, 128, kernel_size=3, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(128)
+        self.relu1 = nn.ReLU()
 
-        self.model = keras.Model(inputs=self.board, outputs=self.value)
-        self.compile(lr)
-        self.model.summary()
+        self.conv2 = nn.Conv2d(128, 128, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(128)
+        self.relu2 = nn.ReLU()
 
-    def compile(self, lr):
-        self.model.compile(keras.optimizers.Adam(lr=lr), loss=tf.losses.mean_squared_error)
+        self.conv3 = nn.Conv2d(128, 128, kernel_size=3, padding=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(128)
+        self.relu3 = nn.ReLU()
 
-    def set_lr(self, lr):
-        self.model.compile(keras.optimizers.Adam(lr=lr), loss=tf.losses.mean_squared_error)
+        # Final 1x1 convolution reducing channels to 1
+        self.conv4 = nn.Conv2d(128, 1, kernel_size=1, padding=0, bias=False)
+        self.bn4 = nn.BatchNorm2d(1)
+        self.relu4 = nn.ReLU()
 
-    def fit_model(self, states, targets, batch_size, epochs):
-        self.model.fit(states, targets, batch_size=batch_size, epochs=epochs)
+        self.flatten = nn.Flatten()
+        # Calculate flattened size: 1 channel * height * width
+        fc1_in_features = 1 * board_height * board_width
+        self.fc1 = nn.Linear(fc1_in_features, 128)
+        self.relu_fc1 = nn.ReLU()
 
-    def predict(self, features):
-        return self.model.predict(features)
+        self.fc2 = nn.Linear(128, 1)
+        self.tanh_out = nn.Tanh()
 
-    def load_weights(self, filepath):
-        self.model.load_weights(filepath)
+        # Keras model.summary() equivalent is printing the model instance
+        # print(self)
 
-    def save_weights(self, filepath):
-        self.model.save_weights(filepath)
+    def forward(self, x):
+        # Input x shape: (batch, channels, height, width)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu1(x)
 
-    def save_model(self, filepath):
-        self.model.save(filepath)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu2(x)
 
-    def load_model(self, filepath):
-        self.model = keras.models.load_model(filepath)
+        x = self.conv3(x)
+        x = self.bn3(x)
+        x = self.relu3(x)
+
+        x = self.conv4(x)
+        x = self.bn4(x)
+        x = self.relu4(x)
+
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.relu_fc1(x)
+
+        x = self.fc2(x)
+        x = self.tanh_out(x)
+
+        return x
+
+# Removed Keras-specific methods: compile, set_lr, fit_model, predict, load_weights, save_weights, save_model, load_model

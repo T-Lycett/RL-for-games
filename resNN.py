@@ -1,73 +1,107 @@
-import tensorflow as tf
-from tensorflow import keras
-import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import checkersBoard
 
+# Define the Residual Block as a separate module
+class ResidualBlock(nn.Module):
+    def __init__(self, num_channels):
+        super(ResidualBlock, self).__init__()
+        self.conv1 = nn.Conv2d(num_channels, num_channels, kernel_size=3, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(num_channels)
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(num_channels, num_channels, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(num_channels)
+        self.relu2 = nn.ReLU()
 
-class ResNN():
-    def __init__(self, lr=0.000001, residual_blocks=2, width=64, q_learning_only=True):
-        conv2d = keras.layers.Conv2D
-        self.dformat = 'channels_last'
-        board_height = checkersBoard.CheckersBoard.board_height
-        board_width = checkersBoard.CheckersBoard.board_width
+    def forward(self, x):
+        residual = x
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu1(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out += residual # Add the residual connection
+        out = self.relu2(out)
+        return out
 
-        self.board = keras.layers.Input(dtype=tf.float32, shape=[board_height, board_width, 5])
-        conv1 = keras.layers.BatchNormalization(axis=-1)(
-            conv2d(width, kernel_size=[3, 3], activation=tf.nn.relu, data_format=self.dformat, padding='same', use_bias=False)(
-                self.board))
-        res_tower = self.residual_block(conv1, width)
-        for _ in range(residual_blocks - 1):
-            res_tower = self.residual_block(res_tower, width)
-        conv2 = keras.layers.BatchNormalization(axis=-1)(
-            conv2d(32, kernel_size=(1, 1), activation=tf.nn.relu, data_format=self.dformat, padding='same', use_bias=False)(
-                res_tower))
-        conv_flat = keras.layers.Flatten()(conv2)
-        fc1 = keras.layers.Dense(width, activation=tf.nn.relu)(conv_flat)
-        self.value = keras.layers.Dense(1, activation=tf.nn.tanh)(fc1)
+class ResNN(nn.Module):
+    def __init__(self, residual_blocks=2, width=64, q_learning_only=True):
+        super(ResNN, self).__init__()
+        self.board_height = checkersBoard.CheckersBoard.board_height
+        self.board_width = checkersBoard.CheckersBoard.board_width
+        self.action_size = checkersBoard.CheckersBoard.action_size
+        self.q_learning_only = q_learning_only
 
+        # Input channels correspond to the 5 planes from extract_features (assuming channels_first now)
+        in_channels = 5
+
+        # Initial convolutional block
+        self.conv_in = nn.Conv2d(in_channels, width, kernel_size=3, padding=1, bias=False)
+        self.bn_in = nn.BatchNorm2d(width)
+        self.relu_in = nn.ReLU()
+
+        # Residual tower
+        self.res_tower = nn.Sequential(
+            *[ResidualBlock(width) for _ in range(residual_blocks)]
+        )
+
+        # Value head
+        self.conv_val = nn.Conv2d(width, 32, kernel_size=1, bias=False) # 1x1 conv
+        self.bn_val = nn.BatchNorm2d(32)
+        self.relu_val = nn.ReLU()
+        self.flatten_val = nn.Flatten()
+        # Calculate flattened size: 32 channels * height * width
+        fc1_in_features = 32 * self.board_height * self.board_width
+        self.fc1_val = nn.Linear(fc1_in_features, width)
+        self.relu_fc1_val = nn.ReLU()
+        self.fc2_val = nn.Linear(width, 1)
+        self.tanh_val = nn.Tanh()
+
+        # Policy head (optional)
         if not q_learning_only:
-            policy = keras.layers.BatchNormalization(axis=-1)(conv2d(32, [1, 1], data_format=self.dformat, padding='same', use_bias=False)(res_tower))
-            policy = keras.layers.Flatten()(policy)
-            self.probabilities = keras.layers.Dense(checkersBoard.CheckersBoard.action_size, activation=keras.activations.softmax)(policy)
+            self.conv_pol = nn.Conv2d(width, 32, kernel_size=1, bias=False) # 1x1 conv
+            self.bn_pol = nn.BatchNorm2d(32)
+            self.relu_pol = nn.ReLU()
+            self.flatten_pol = nn.Flatten()
+            # Calculate flattened size: 32 channels * height * width
+            fc_pol_in_features = 32 * self.board_height * self.board_width
+            self.fc_pol = nn.Linear(fc_pol_in_features, self.action_size)
+            # Softmax will be applied during loss calculation (CrossEntropyLoss) or manually if needed
 
-        if not q_learning_only:
-            self.model = keras.Model(inputs=self.board, outputs=[self.value, self.probabilities])
-            self.model.compile(keras.optimizers.Adam(lr=lr), loss=[keras.losses.mean_squared_error, keras.losses.categorical_crossentropy])
+    def forward(self, x):
+        # Input x shape: (batch, channels, height, width)
+
+        # Initial conv
+        out = self.conv_in(x)
+        out = self.bn_in(out)
+        out = self.relu_in(out)
+
+        # Residual blocks
+        out = self.res_tower(out)
+
+        # Value head calculation
+        val = self.conv_val(out)
+        val = self.bn_val(val)
+        val = self.relu_val(val)
+        val = self.flatten_val(val)
+        val = self.fc1_val(val)
+        val = self.relu_fc1_val(val)
+        value_out = self.fc2_val(val)
+        value_out = self.tanh_val(value_out)
+
+        if self.q_learning_only:
+            return value_out
         else:
-            self.model = keras.Model(inputs=self.board, outputs=self.value)
-            self.model.compile(keras.optimizers.Adam(lr=lr), loss=keras.losses.mean_squared_error)
+            # Policy head calculation
+            pol = self.conv_pol(out)
+            pol = self.bn_pol(pol)
+            pol = self.relu_pol(pol)
+            pol = self.flatten_pol(pol)
+            policy_out = self.fc_pol(pol)
+            # Note: Softmax is not applied here, CrossEntropyLoss expects raw logits
+            return value_out, policy_out
 
-        # self.model = keras.Model(inputs=self.board, outputs=[self.value])
-        # self.model.compile(keras.optimizers.Adam(lr=lr),loss=[keras.losses.mean_squared_error])
-        self.model.summary()
-
-    def residual_block(self, input_layer, width):
-        shortcut = input_layer
-
-        residual = keras.layers.Conv2D(width, kernel_size=(3, 3), data_format=self.dformat, padding='same', use_bias=False)(input_layer)
-        residual = keras.layers.BatchNormalization(axis=-1)(residual)
-        residual = keras.layers.ReLU()(residual)
-        residual = keras.layers.Conv2D(width, kernel_size=(3, 3), data_format=self.dformat, padding='same', use_bias=False)(residual)
-        residual = keras.layers.BatchNormalization(axis=-1)(residual)
-        add_shortcut = keras.layers.add([residual, shortcut])
-        residual_result = keras.layers.ReLU()(add_shortcut)
-
-        return residual_result
-
-    def set_lr(self, lr):
-        self.model.compile(keras.optimizers.Adam(lr=lr), loss=tf.losses.mean_squared_error)
-
-    def fit_model(self, states, targets, batch_size, epochs):
-        self.model.fit(states, targets, batch_size=batch_size, epochs=epochs)
-
-    def predict(self, features):
-        return self.model.predict(features)
-
-    def load_weights(self, filepath):
-        self.model.load_weights(filepath)
-
-    def save_weights(self, filepath):
-        self.model.save_weights(filepath)
-
-    def save_model(self, filepath):
-        self.model.save(filepath)
+# Removed Keras-specific methods: compile, fit_model, predict, load_weights, save_weights, save_model
+# Removed set_lr for now, optimizer LR is handled externally
+# Removed model.summary(), use print(model) in PyTorch
