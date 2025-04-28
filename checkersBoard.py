@@ -65,22 +65,99 @@ class CheckersBoard():
         self.update_valid_moves(-1)
 
     def set_positions(self, board):
-        self.p1_positions = board.p1_positions.copy()
-        self.p2_positions = board.p2_positions.copy()
-        self.p1_kings = board.p1_kings.copy()
-        self.p2_kings = board.p2_kings.copy()
-        self.p1_valid_moves = board.p1_valid_moves.copy()
-        self.p2_valid_moves = board.p2_valid_moves.copy()
-        self.p1_valid_moves_single_jumps = board.p1_valid_moves_single_jumps.copy()
-        self.p2_valid_moves_single_jumps = board.p2_valid_moves_single_jumps.copy()
-        self.p1_pieces = board.p1_pieces.copy()
-        self.p2_pieces = board.p2_pieces.copy()
-        self.moves_without_capture = board.moves_without_capture
-        self.p1_valid_moves_updated = board.p1_valid_moves_updated
-        self.p2_valid_moves_updated = board.p2_valid_moves_updated
-        self.current_player = board.current_player
-        self.chain_jump = board.chain_jump
-        self.chain_jump_from = board.chain_jump_from
+        try:
+            if board is None:
+                raise ValueError("Cannot set positions from None board")
+                
+            # Make defensive copies of all board arrays
+            self.p1_positions = np.copy(board.p1_positions)
+            self.p2_positions = np.copy(board.p2_positions)
+            self.p1_kings = np.copy(board.p1_kings)
+            self.p2_kings = np.copy(board.p2_kings)
+            
+            # Handle case where valid_moves might not be initialized
+            if hasattr(board, 'p1_valid_moves'):
+                self.p1_valid_moves = board.p1_valid_moves.copy() if board.p1_valid_moves is not None else []
+            else:
+                self.p1_valid_moves = []
+                
+            if hasattr(board, 'p2_valid_moves'):
+                self.p2_valid_moves = board.p2_valid_moves.copy() if board.p2_valid_moves is not None else []
+            else:
+                self.p2_valid_moves = []
+                
+            if hasattr(board, 'p1_valid_moves_single_jumps'):
+                self.p1_valid_moves_single_jumps = board.p1_valid_moves_single_jumps.copy() if board.p1_valid_moves_single_jumps is not None else []
+            else:
+                self.p1_valid_moves_single_jumps = []
+                
+            if hasattr(board, 'p2_valid_moves_single_jumps'):
+                self.p2_valid_moves_single_jumps = board.p2_valid_moves_single_jumps.copy() if board.p2_valid_moves_single_jumps is not None else []
+            else:
+                self.p2_valid_moves_single_jumps = []
+                
+            # Dictionaries need special handling to avoid reference issues
+            self.p1_pieces = board.p1_pieces.copy() if hasattr(board, 'p1_pieces') and board.p1_pieces is not None else {}
+            self.p2_pieces = board.p2_pieces.copy() if hasattr(board, 'p2_pieces') and board.p2_pieces is not None else {}
+            
+            # Copy remaining state
+            self.moves_without_capture = getattr(board, 'moves_without_capture', 0)
+            self.p1_valid_moves_updated = getattr(board, 'p1_valid_moves_updated', False)
+            self.p2_valid_moves_updated = getattr(board, 'p2_valid_moves_updated', False)
+            self.current_player = getattr(board, 'current_player', 1)
+            self.chain_jump = getattr(board, 'chain_jump', False)
+            self.chain_jump_from = getattr(board, 'chain_jump_from', None)
+            
+            # Validate board state after copying
+            self._validate_board_state()
+            
+        except Exception as e:
+            print(f"ERROR in set_positions: {e}")
+            import traceback
+            traceback.print_exc()
+            # Reset to a safe state if copying failed
+            self.reset()
+            self.set_start_positions()
+            
+    def _validate_board_state(self):
+        """Validate the board state and attempt to correct issues."""
+        # Check numpy arrays have correct shape
+        if self.p1_positions.shape != (self.board_height, self.board_width):
+            print(f"ERROR: Invalid p1_positions shape {self.p1_positions.shape}, resetting")
+            self.p1_positions = np.zeros((self.board_height, self.board_width))
+            
+        if self.p2_positions.shape != (self.board_height, self.board_width):
+            print(f"ERROR: Invalid p2_positions shape {self.p2_positions.shape}, resetting")
+            self.p2_positions = np.zeros((self.board_height, self.board_width))
+            
+        if self.p1_kings.shape != (self.board_height, self.board_width):
+            print(f"ERROR: Invalid p1_kings shape {self.p1_kings.shape}, resetting")
+            self.p1_kings = np.zeros((self.board_height, self.board_width))
+            
+        if self.p2_kings.shape != (self.board_height, self.board_width):
+            print(f"ERROR: Invalid p2_kings shape {self.p2_kings.shape}, resetting")
+            self.p2_kings = np.zeros((self.board_height, self.board_width))
+            
+        # Check for overlapping pieces (should never happen)
+        overlap = np.logical_and(self.p1_positions > 0, self.p2_positions > 0)
+        if np.any(overlap):
+            print("ERROR: Overlapping pieces detected, fixing")
+            # Fix by removing overlapping pieces
+            self.p1_positions[overlap] = 0
+            self.p2_positions[overlap] = 0
+            self.p1_kings[overlap] = 0
+            self.p2_kings[overlap] = 0
+            
+        # Ensure kings only exist where there are pieces
+        invalid_kings_p1 = np.logical_and(self.p1_kings > 0, self.p1_positions == 0)
+        if np.any(invalid_kings_p1):
+            print("ERROR: P1 kings without pieces detected, fixing")
+            self.p1_kings[invalid_kings_p1] = 0
+            
+        invalid_kings_p2 = np.logical_and(self.p2_kings > 0, self.p2_positions == 0)
+        if np.any(invalid_kings_p2):
+            print("ERROR: P2 kings without pieces detected, fixing")
+            self.p2_kings[invalid_kings_p2] = 0
 
     def is_valid_position(self, row, column):
         if row >= 0 and row < CheckersBoard.board_height and column >= 0 and column < CheckersBoard.board_width:
