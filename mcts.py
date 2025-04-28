@@ -86,7 +86,10 @@ class MCTS:
 
         # Add Dirichlet noise to root priors for exploration during training.
         if dir_alpha > 0:
+            # Ensure noise array length matches the number of valid moves
             self.noise = np.random.dirichlet([dir_alpha] * len(valid_moves))
+        else:
+            self.noise = None
 
         # Initialize bounds for the root state.
         self.v_lower_bound[(state)] = -math.inf
@@ -345,35 +348,48 @@ class MCTS:
 
         # Calculate UCT scores for all valid moves.
         for move, move_index in valid_moves:
-            move_index = int(move_index)
-            move_state = TDAgent.extract_features(move, move.current_player).tobytes()
+            try:
+                move_index = int(move_index)
+                move_state = TDAgent.extract_features(move, move.current_player).tobytes()
 
-            # Get Q-value and visit counts for the action (state -> move_state)
-            action_visits = self.Nsa.get((state, move_state), 0)
-            child_q = self.Qs.get(move_state, 0) # Default Q=0 if child not expanded yet
+                # Get Q-value and visit counts for the action (state -> move_state)
+                action_visits = self.Nsa.get((state, move_state), 0)
+                child_q = self.Qs.get(move_state, 0) # Default Q=0 if child not expanded yet
+                
+                # Check for NaN values
+                if math.isnan(child_q):
+                    print(f"[MCTS Warning] Found NaN Q-value for move {move_index}. Setting to 0.")
+                    child_q = 0
 
-            # Prior probability for this action
-            prior_p = self.Ps[state][move_index] if state in self.Ps and len(self.Ps[state]) > move_index else 0
+                # Prior probability for this action
+                prior_p = 0
+                if state in self.Ps and len(self.Ps[state]) > move_index:
+                    prior_p = self.Ps[state][move_index]
+                    if math.isnan(prior_p):
+                        print(f"[MCTS Warning] Found NaN prior for move {move_index}. Setting to small value.")
+                        prior_p = 0.001
 
-            # Apply Dirichlet noise at the root node during training
-            if depth == 1 and dir_alpha > 0 and self.use_policy_head and self.noise is not None:
-                prior_p = (prior_p * (1 - self.e)) + self.noise[i] * self.e
+                # Apply Dirichlet noise at the root node during training
+                if depth == 1 and dir_alpha > 0 and self.use_policy_head and self.noise is not None and i < len(self.noise):
+                    prior_p = (prior_p * (1 - self.e)) + self.noise[i] * self.e
 
-            # Calculate UCT score
-            if action_visits > 0:
-                # Value from current player's perspective
-                q_value_perspective = child_q * current_player
-                uct_score = q_value_perspective + self.cpuct * prior_p * (math.sqrt(self.Ns[state]) / (1 + action_visits))
-            else:
-                # If action not taken, use prior probability and parent visit count
-                # Give a bonus to unexplored actions based on their prior
-                # (Simplified UCT term for unvisited actions)
-                uct_score = self.cpuct * prior_p * math.sqrt(self.Ns[state] + 1e-8) # Add epsilon for sqrt(0)
+                # Calculate UCT score
+                if action_visits > 0:
+                    # Value from current player's perspective
+                    q_value_perspective = child_q * current_player
+                    uct_score = q_value_perspective + self.cpuct * prior_p * (math.sqrt(self.Ns[state]) / (1 + action_visits))
+                else:
+                    # If action not taken, use prior probability and parent visit count
+                    # Give a bonus to unexplored actions based on their prior
+                    # (Simplified UCT term for unvisited actions)
+                    uct_score = self.cpuct * prior_p * math.sqrt(self.Ns[state] + 1e-8) # Add epsilon for sqrt(0)
 
-            if uct_score > best_u:
-                best_u = uct_score
-                best_move = move
-                best_move_state = move_state
+                if uct_score > best_u:
+                    best_u = uct_score
+                    best_move = move
+                    best_move_state = move_state
+            except Exception as e:
+                print(f"[MCTS Error] Exception during move evaluation: {e}")
             i += 1
 
         # --- Recursive Call --- : Recurse on the selected best move.
