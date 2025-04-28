@@ -91,30 +91,48 @@ if __name__ == '__main__':
                     if b.current_player == 1:
                         print('game ' + str(g + 1) + ' - move ' + str(num_moves) + ' - player 1')
                         move_start_time = time.time()
-                        move, val = TD_agent.get_move(b, 1, mcts_instance, kld_threshold)
-                        move_end_time = time.time() - move_start_time
-                        print('elapsed time: ' + str(move_end_time))
-                        if mcts_instance.mcts_sims != 0:
-                            print('max depth: ' + str(mcts_instance.max_depth))
-                            print('number of simulations: ' + str(mcts_instance.mcts_sims))
-                            if move_end_time != 0:
-                                print('nodes per second: ' + str(mcts_instance.mcts_sims / move_end_time))
-                            searches.append(mcts_instance.mcts_sims)
+                        try:
+                            move, val = TD_agent.get_move(b, 1, mcts_instance, kld_threshold)
+                            move_end_time = time.time() - move_start_time
+                            print('elapsed time: ' + str(move_end_time))
+                            if mcts_instance.mcts_sims != 0:
+                                print('max depth: ' + str(mcts_instance.max_depth))
+                                print('number of simulations: ' + str(mcts_instance.mcts_sims))
+                                if move_end_time != 0:
+                                    print('nodes per second: ' + str(mcts_instance.mcts_sims / move_end_time))
+                                searches.append(mcts_instance.mcts_sims)
+                        except Exception as e:
+                            print(f"ERROR in TD_agent.get_move: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            move, val = None, None
                     else:
                         print('game ' + str(g + 1) + ' - move ' + str(num_moves) + ' - player 2')
                         move_start_time = time.time()
-                        move, val = minimax_agent.get_move(b)
-                        move_end_time = time.time() - move_start_time
-                        print('elapsed time: ' + str(move_end_time))
-                        if move_end_time != 0:
-                            print('nodes per second: ' + str(minimax_agent.nodes_visited / move_end_time))
+                        try:
+                            move, val = minimax_agent.get_move(b)
+                            move_end_time = time.time() - move_start_time
+                            print('elapsed time: ' + str(move_end_time))
+                            if move_end_time != 0:
+                                print('nodes per second: ' + str(minimax_agent.nodes_visited / move_end_time))
+                        except Exception as e:
+                            print(f"ERROR in minimax_agent.get_move: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            move, val = None, None
                     # p1_move, val = q_learner.get_move(b, 1)
                     try:
-                        b.set_positions(move)
-                    except:
                         if move is None:
                             print('Error: valid move list was empty, resetting the game.')
                             b = board.CheckersBoard(True)
+                        else:
+                            b.set_positions(move)
+                    except Exception as e:
+                        print(f"ERROR setting board positions: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        print('Resetting the game due to board error.')
+                        b = board.CheckersBoard(True)
 
                     print(b.p1_positions + b.p1_kings - b.p2_positions - b.p2_kings)
                     print('moves until draw: ' + str(50 - b.moves_without_capture))
