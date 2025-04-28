@@ -1,5 +1,3 @@
-import tensorflow as tf
-from tensorflow import keras
 import checkersBoard
 import numpy as np
 import math
@@ -42,7 +40,8 @@ def extract_features(board, current_player):
         players_kings = flip_pieces(players_kings)
         opp_kings = flip_pieces(opp_kings)
     moves_until_draw = np.zeros((board_height, board_width)) + (50 - board.moves_without_capture) / 50
-    return np.stack([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw], axis=-1)
+    # Stack features along axis 0 for channels_first format (C, H, W)
+    return np.stack([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw], axis=0)
 
 
 def get_move(board, player, mcts_instance, kld_threshold, temperature, max_sims=None):
@@ -282,7 +281,8 @@ class TDAgent():
             players_kings = flip_pieces(players_kings)
             opp_kings = flip_pieces(opp_kings)
         moves_until_draw = np.zeros((board_height, board_width)) + (50 - board.moves_without_capture) / 50
-        return np.stack([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw], axis=-1)
+        # Stack features along axis 0 for channels_first format (C, H, W)
+        return np.stack([players_pieces, opp_pieces, players_kings, opp_kings, moves_until_draw], axis=0)
 
     @staticmethod
     def flip_pieces(pieces):
