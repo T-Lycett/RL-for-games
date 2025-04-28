@@ -279,10 +279,23 @@ class MCTS:
             # print(f"[MCTS Debug] Expanding node at depth {depth}. Calling NN predict.") # DEBUG
             nn_output = None
             try:
+                # Check for valid features shape before prediction
+                if features.shape[1:] != (checkersBoard.CheckersBoard.board_height, 
+                                         checkersBoard.CheckersBoard.board_width, 5):
+                    print(f"[MCTS Error] Invalid features shape: {features.shape}. Expected (1, 8, 8, 5).")
+                    raise ValueError("Invalid features shape")
+                    
+                # Handle potential NaN values in features
+                if np.isnan(features).any():
+                    print(f"[MCTS Error] NaN values in features.")
+                    features = np.nan_to_num(features, nan=0.0)
+                    
                 nn_output = self.nnet_model.predict(features)
                 # print(f"[MCTS Debug] NN predict output: {nn_output}") # DEBUG
             except Exception as e:
                 print(f"[MCTS Error] Exception during NN prediction: {e}")
+                import traceback
+                traceback.print_exc()
                 # Decide how to handle NN error - maybe return neutral value?
                 v = 0.0
                 pi = np.ones_like(valids) * valids # Uniform policy over valid moves
