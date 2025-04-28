@@ -46,7 +46,31 @@ if __name__ == '__main__':
     opponent_depth = 7
     max_opponent_depth = 8
     minimax_agent2 = minimaxAgent.MinimaxAgent(-1, 4)
-    TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file, q_learning=q_learning_only)
+    
+    # Check if model file exists and create it if needed
+    try:
+        if not os.path.exists(model_file):
+            print(f"Model file {model_file} not found. This may cause errors later.")
+            
+            # Create an empty model directory if needed for saving later
+            model_dir = os.path.dirname(model_file)
+            if model_dir and not os.path.exists(model_dir):
+                os.makedirs(model_dir)
+                print(f"Created directory {model_dir} for model file")
+    except Exception as e:
+        print(f"Error checking/creating model path: {e}")
+    
+    # Initialize TDAgent with error handling
+    try:
+        TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file, q_learning=q_learning_only)
+    except Exception as e:
+        print(f"Error initializing TDAgent with model {model_file}: {e}")
+        import traceback
+        traceback.print_exc()
+        print("Exiting program due to critical initialization error.")
+        import sys
+        sys.exit(1)
+        
     # TD_agent.load_weights('./weights/res_nn_Model')
     # TD_agent.load_model('cnn64x2.h5')
     q_learner = QLearner.QLearner()
