@@ -233,63 +233,117 @@ class CheckersBoard():
     def is_valid_jump(self, player, start, end):
         # if abs(start[0] - end[0]) != 2 or abs(start[1] - end[1]) != 2:
             # return False
-        if not self.is_empty_position(end[0], end[1]):
+        # Check landing square validity first
+        if not self.is_valid_position(end[0], end[1]) or not self.is_empty_position(end[0], end[1]):
             return False
-        # player_positions = self.get_player_positions(player)
+        # Check starting square validity
+        player_positions = self.get_player_positions(player)
+        if not self.is_valid_position(start[0], start[1]) or player_positions[start[0], start[1]] == 0:
+            return False
+
         opponent_positions = self.get_player_positions(-player)
-        x1 = int(start[0] + ((end[0] - start[0]) / 2))
-        y1 = int(start[1] + ((end[1] - start[1]) / 2))
-        if opponent_positions[x1, y1] != 1:
+        # Calculate middle square coordinates
+        x1 = start[0] + ((end[0] - start[0]) // 2) # Use integer division
+        y1 = start[1] + ((end[1] - start[1]) // 2)
+
+        # Check if middle square is valid and contains an opponent piece
+        if not self.is_valid_position(x1, y1) or opponent_positions[x1, y1] != 1:
             return False
+
+        # Check direction for non-king pieces
         players_kings = self.get_players_kings(player)
-        if players_kings[start[0], start[1]] == 0 and start[0] - x1 != player:
-            return False
+        if players_kings[start[0], start[1]] == 0 and start[0] - end[0] == player * 2: # Moving backwards check
+            # Regular piece moving backwards (player 1: 5->7, player -1: 2->0)
+             if start[0] - x1 != player: # Check intermediate step direction too
+                 return False
+        elif players_kings[start[0], start[1]] == 0 and start[0] - x1 != player:
+             # Handles the case where the jump is diagonal but the first step is backwards
+             return False
+
         return True
 
-    def get_jumps(self, player, pos, include_chain_jumps=True):
+    def get_jumps(self, player, pos, include_chain_jumps=True, visited_in_chain=None):
+        """
+        Recursively finds all possible jump sequences starting from a given position.
+
+        Args:
+            player: The player whose turn it is (1 or -1).
+            pos: The starting position tuple (row, column) for the jump.
+            include_chain_jumps (bool): If True, finds multi-step jump sequences.
+                                        If False, only finds single jumps from 'pos'.
+            visited_in_chain (set, optional): Used internally to track visited states
+                                             (board_state, player, jump_from_pos)
+                                             within the current recursive chain to prevent cycles.
+
+        Returns:
+            tuple: (list_of_resulting_board_states, list_of_corresponding_action_indices)
+        """
         jumps = []
-        chain_jumps = []
         index_list = []
-        if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] + 2]):
-            index_list.append(self.move_to_index(pos, Direction.DOWN_RIGHT.value, jump=True))
-            new_jump = CheckersBoard(board=self)
-            if new_jump.execute_jump(player, pos, [pos[0] + 2, pos[1] + 2]):
-                if include_chain_jumps:
-                    chain_jumps, _ = new_jump.get_jumps(player, [pos[0] + 2, pos[1] + 2])
-                if len(chain_jumps) > 0 and include_chain_jumps:
-                    jumps = np.hstack((jumps, chain_jumps))
-                else:
-                    jumps = np.append(jumps, new_jump)
-        if self.is_valid_jump(player, pos, [pos[0] + 2, pos[1] - 2]):
-            index_list.append(self.move_to_index(pos, Direction.DOWN_LEFT.value, jump=True))
-            new_jump = CheckersBoard(board=self)
-            if new_jump.execute_jump(player, pos, [pos[0] + 2, pos[1] - 2]):
-                if include_chain_jumps:
-                    chain_jumps, _ = new_jump.get_jumps(player, [pos[0] + 2, pos[1] - 2])
-                if len(chain_jumps) > 0 and include_chain_jumps:
-                    jumps = np.hstack((jumps, chain_jumps))
-                else:
-                    jumps = np.append(jumps, new_jump)
-        if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] + 2]):
-            index_list.append(self.move_to_index(pos, Direction.UP_RIGHT.value, jump=True))
-            new_jump = CheckersBoard(board=self)
-            if new_jump.execute_jump(player, pos, [pos[0] - 2, pos[1] + 2]):
-                if include_chain_jumps:
-                    chain_jumps, _ = new_jump.get_jumps(player, [pos[0] - 2, pos[1] + 2])
-                if len(chain_jumps) > 0 and include_chain_jumps:
-                    jumps = np.hstack((jumps, chain_jumps))
-                else:
-                    jumps = np.append(jumps, new_jump)
-        if self.is_valid_jump(player, pos, [pos[0] - 2, pos[1] - 2]):
-            index_list.append(self.move_to_index(pos, Direction.UP_LEFT.value, jump=True))
-            new_jump = CheckersBoard(board=self)
-            if new_jump.execute_jump(player, pos, [pos[0] - 2, pos[1] - 2]):
-                if include_chain_jumps:
-                    chain_jumps, _ = new_jump.get_jumps(player, [pos[0] - 2, pos[1] - 2])
-                if len(chain_jumps) > 0 and include_chain_jumps:
-                    jumps = np.hstack((jumps, chain_jumps))
-                else:
-                    jumps = np.append(jumps, new_jump)
+
+        # Initialize visited set for the start of a potential chain
+        if visited_in_chain is None:
+            visited_in_chain = set()
+
+        # Generate a representation of the state *before* the jump from 'pos'
+        # Key includes board state, player, and the position *from which* we are considering jumps.
+        current_state_key = (self.p1_positions.tobytes(), self.p2_positions.tobytes(),
+                           self.p1_kings.tobytes(), self.p2_kings.tobytes(),
+                           player, tuple(pos))
+
+        # If we've already tried jumping *from* this position *with this board state*
+        # in this specific chain, stop recursion to prevent cycles.
+        if current_state_key in visited_in_chain:
+            # print(f"[CheckersBoard Debug] Cycle detected in get_jumps for player {player} at pos {pos}. Aborting branch.") # DEBUG
+            return [], [] # Return empty list to break the loop
+
+        # Add current state (board + player + jump_start_pos) to visited set for this path
+        visited_in_chain_copy = visited_in_chain.copy() # Create copy before modifying
+        visited_in_chain_copy.add(current_state_key)
+
+        # Define potential jump landing squares
+        possible_ends = [
+            ([pos[0] + 2, pos[1] + 2], Direction.DOWN_RIGHT), # Down-Right
+            ([pos[0] + 2, pos[1] - 2], Direction.DOWN_LEFT),  # Down-Left
+            ([pos[0] - 2, pos[1] + 2], Direction.UP_RIGHT),   # Up-Right
+            ([pos[0] - 2, pos[1] - 2], Direction.UP_LEFT)    # Up-Left
+        ]
+
+        # Check each potential jump direction
+        for end_pos, direction in possible_ends:
+            if self.is_valid_jump(player, pos, end_pos):
+                action_index = self.move_to_index(pos, direction.value, jump=True)
+                # Create a copy of the board to execute the jump on
+                new_jump_board = CheckersBoard(board=self)
+                # Execute the single jump on the copy
+                if new_jump_board.execute_jump(player, pos, end_pos):
+                    # After execute_jump, new_jump_board.chain_jump indicates if further jumps are possible
+                    # from end_pos on that board.
+
+                    can_continue_chain = new_jump_board.chain_jump
+
+                    if include_chain_jumps and can_continue_chain:
+                        # If chain jumps are allowed and possible, recurse
+                        # Pass the copied visited set down
+                        recursive_jumps, recursive_indices = new_jump_board.get_jumps(
+                            player, end_pos, include_chain_jumps=True, visited_in_chain=visited_in_chain_copy
+                        )
+                        # If the recursion found further jumps, add them
+                        if len(recursive_jumps) > 0:
+                            jumps.extend(recursive_jumps)
+                            # Associate the *initial* action index with *all* resulting boards from the chain
+                            index_list.extend([action_index] * len(recursive_jumps))
+                        else:
+                            # If recursion found no further jumps (e.g., blocked by cycle),
+                            # add the board state after the first jump.
+                            jumps.append(new_jump_board)
+                            index_list.append(action_index)
+                    else:
+                        # If not including chain jumps OR if this jump ends the chain,
+                        # add the board state resulting from this single jump.
+                        jumps.append(new_jump_board)
+                        index_list.append(action_index)
+
         return jumps, index_list
 
     def get_valid_moves(self, player, include_index=False, include_chain_jumps=True):
