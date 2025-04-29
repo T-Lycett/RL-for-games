@@ -429,7 +429,7 @@ class TDAgent():
         
         print(f"Training loss: {loss.item()}")
 
-    def self_play(self, kld_threshold, num_games=1000, iterations=1, lambda_val=0.9, batch_size=1024):
+    def self_play(self, kld_threshold, num_games=1000, iterations=1, lambda_val=0.9, batch_size=512):
         if not self.learner:
             return False
             
