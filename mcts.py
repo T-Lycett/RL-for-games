@@ -107,7 +107,7 @@ class MCTS:
             self.search(board, self.v_lower_bound[(state)], self.v_upper_bound[(state)], 0, dir_alpha)
 
             # Periodically check for KL-divergence convergence.
-            if self.mcts_sims % 25 == 0:
+            if self.mcts_sims % 40 == 0:
                 # print(f"[MCTS Debug] Check KL divergence at sim {self.mcts_sims}") # DEBUG
                 new_probs = np.zeros(checkersBoard.CheckersBoard.action_size)
                 counts = np.zeros(checkersBoard.CheckersBoard.action_size)
@@ -157,7 +157,7 @@ class MCTS:
                 if verbose:
                     root_q = self.Qs.get(state, "N/A")
                     root_lower = self.v_lower_bound.get(state, "N/A")
-                    root_upper = self.v_upper_bound.get(state, "N/A")
+                    root_upper = self.v_upper_bound.get(state, "N/A") 
                     print('root q: ' + str(root_q) + ' v-: ' + str(root_lower) + ' v+: ' + str(root_upper))
                     print('counts: ' + str([x for x in counts if x != 0]))
                     print('probabilities: ' + str([x for x in node_probs if x != 0 and node_probs is not None]))

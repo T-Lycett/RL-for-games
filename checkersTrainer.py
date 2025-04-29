@@ -94,7 +94,7 @@ if __name__ == '__main__':
     test_games = 10
     epoch_per_iteration = 1
     kld_threshold = 0.00288
-    target_average_num_sims = 250
+    target_average_num_sims = 200
     calibration_runs = 2
     wins = []
     draws = []

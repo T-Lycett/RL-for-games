@@ -132,7 +132,7 @@ def self_play_game_player(model_filename, kld_threshold, q_learning):
                 # state = extract_features(board, current_player)
                 # move_history.append([state, False, None, None])
                 num_moves = 0
-                moves_until_t0 = math.inf # random.randint(1, max_moves_until_t0)
+                moves_until_t0 = 40 # random.randint(1, max_moves_until_t0)
                 num_mcts_sims = []
                 max_moves = 200  # Safety limit to prevent infinite games
                 
