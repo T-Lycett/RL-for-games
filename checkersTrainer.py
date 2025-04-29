@@ -6,12 +6,15 @@ import time
 import math
 import cProfile, pstats, io
 from pstats import SortKey
+import matplotlib
+matplotlib.use('TkAgg') # Set backend *before* importing pyplot
 import matplotlib.pyplot as plt
 from multiprocessing import freeze_support
 import QLearner
 import mcts
 import torch
 
+plt.ion() # Enable interactive mode
 
 def set_kld_threshold(current_threshold, average_mcts_sims, target_mcts_sims):
     increment = 0.3
@@ -87,17 +90,23 @@ if __name__ == '__main__':
     q_learner = QLearner.QLearner()
     start = time.time()
     iterations = 1000
-    self_play_games_per_iteration = 100
+    self_play_games_per_iteration = 50
     test_games = 10
     epoch_per_iteration = 1
     kld_threshold = 0.00288
-    target_average_num_sims = 300
+    target_average_num_sims = 250
     calibration_runs = 2
     wins = []
     draws = []
     losses = []
     q_file = './q_values8x6.pickle'
     # q_learner.load_q_values(q_file)
+    
+    # Create figure and axes outside the loop
+    fig, ax = plt.subplots()
+    plt.show(block=False) # Show the window initially non-blocking
+    plt.pause(0.1) # Add a small pause to allow window draw
+    
     for i in range(iterations):
         winner = None
         searches = []
@@ -183,9 +192,20 @@ if __name__ == '__main__':
                     draws[int(i/1)] += 1
                 elif winner == -1:
                     losses[int(i/1)] += 1
-                plt.cla()
-                plt.plot(range(1, 1 + len(wins)), wins, 'g.', range(1, 1 + len(draws)), draws, 'b.', range(1, 1 + len(losses)), losses, 'r.')
-                plt.pause(0.001)
+                
+                # Use axes object for plotting
+                ax.cla() 
+                ax.plot(range(1, 1 + len(wins)), wins, 'g.', label='Wins')
+                ax.plot(range(1, 1 + len(draws)), draws, 'b.', label='Draws')
+                ax.plot(range(1, 1 + len(losses)), losses, 'r.', label='Losses')
+                ax.legend()
+                ax.set_xlabel("Iteration")
+                ax.set_ylabel("Count")
+                ax.set_title("Training Progress")
+                
+                # Explicitly draw and pause
+                plt.draw() 
+                plt.pause(0.1)
 
             average_sims = sum(searches) / len(searches)
             print('average sims: ' + str(average_sims))
@@ -202,7 +222,9 @@ if __name__ == '__main__':
             opponent_depth += opponent_depth_increase_interval
             opponent_depth = min(max_opponent_depth, opponent_depth)
         print('average time per iteration: ' + str((time.time() - start) / (i + 1)))
-    plt.show()
+    
+    # plt.show() # Commented out - plt.ion() keeps the plot interactive
+    
     if profile:
         # profiling code from: https://docs.python.org/3/library/profile.html#module-profile
         pr.disable()
