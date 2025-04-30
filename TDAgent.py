@@ -134,12 +134,12 @@ def self_play_game_player(model_filename, kld_threshold, q_learning):
                 num_moves = 0
                 moves_until_t0 = 40 # random.randint(1, max_moves_until_t0)
                 num_mcts_sims = []
-                max_moves = 200  # Safety limit to prevent infinite games
+                max_moves = 300  # Safety limit to prevent infinite games
                 
                 while not game_ended and num_moves < max_moves:
                     try:
                         if num_moves < moves_until_t0:
-                            move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=0.2)
+                            move, probs = get_move(board, current_player, mcts_instance, kld_threshold=kld_threshold, temperature=1.0)
                         else:
                             move, probs = get_move(board, current_player, mcts_instance, kld_threshold, temperature=0.05)
                             
@@ -248,7 +248,7 @@ def self_play_game_player(model_filename, kld_threshold, q_learning):
 
 
 class TDAgent():
-    def __init__(self, model_filename, learner=True, lr=0.0001, search_depth=3, q_learning=True):
+    def __init__(self, model_filename, learner=True, lr=0.0001, search_depth=3, q_learning=True, width=64, residual_blocks=3):
         self.q_learning = q_learning
         self.learner = learner
         self.lr = lr
@@ -257,23 +257,27 @@ class TDAgent():
         self.model_filename = model_filename
         
         # Model architecture parameters
-        self.width = 64  # Default width
-        self.residual_blocks = 3  # Default blocks
+        self.width = width  # Use passed width
+        self.residual_blocks = residual_blocks  # Use passed residual_blocks
         
         # Set up device for PyTorch
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {self.device}")
         
-        # Initialize the PyTorch model
+        # Initialize the PyTorch model with specified architecture
         self.NN = resNN.ResNN(width=self.width, residual_blocks=self.residual_blocks, q_learning_only=q_learning)
         
         try:
             self.NN.load_state_dict(torch.load(model_filename, map_location=self.device))
             print(f"Successfully loaded model from {model_filename}")
+        except FileNotFoundError:
+            print(f"Model file {model_filename} not found. Initializing new model.")
         except Exception as e:
-            print(f"Error loading model: {e}. Will initialize a new model.")
-            # If loading fails, we'll just keep the newly initialized model
-            
+            print(f"Error loading model state_dict from {model_filename}: {e}.")
+            print("Ensure the model architecture in the file matches the definition (width, blocks, q_learning). Initializing new model.")
+            # Re-initialize NN to be safe if loading failed partially
+            self.NN = resNN.ResNN(width=self.width, residual_blocks=self.residual_blocks, q_learning_only=q_learning)
+
         self.NN.to(self.device)
         self.NN.eval()  # Start in evaluation mode
         
@@ -318,7 +322,7 @@ class TDAgent():
             return None, None
         if num_moves == 1:
             mcts_instance.mcts_sims = 0
-            nn_eval = self.evaluate(moves[0][0], moves[0][0].current_player)[0]
+            nn_eval = self.evaluate(moves[0][0], moves[0][0].current_player)
             if player != moves[0][0].current_player:
                 nn_eval *= -1
             return moves[0][0], nn_eval
@@ -342,16 +346,21 @@ class TDAgent():
                     # Fallback to first move
                     move = moves[0][0]
 
-            current_state = self.extract_features(board, board.current_player).tobytes()
-            move_state = self.extract_features(move, move.current_player).tobytes()
-            nn_val = self.evaluate(move, move.current_player)[0]
-            
-            # Safely access MCTS Q-values
-            mcts_val = mcts_instance.Qs.get(current_state, "Unknown")
-            
+            current_state_bytes = self.extract_features(board, board.current_player).tobytes()
+            move_state_bytes = self.extract_features(move, move.current_player).tobytes()
+            nn_val = self.evaluate(move, move.current_player)
+
+            # Safely access MCTS Q-value for the chosen action (current_state -> move_state)
+            # Default to "N/A" if state or action not found in Qs
+            mcts_q_for_action = mcts_instance.Qs.get(current_state_bytes, {}).get(move_state_bytes, "N/A")
+
             if player != move.current_player:
                 nn_val *= -1
-            eval_str = 'Neural Network: ' + str(nn_val) + ', MCTS: ' + str(mcts_val)
+
+            # Format the MCTS Q value only if it's a number
+            mcts_q_str = f"{mcts_q_for_action:.4f}" if isinstance(mcts_q_for_action, (int, float)) else str(mcts_q_for_action)
+
+            eval_str = f'Neural Network: {nn_val:.4f}, MCTS Q(s,a): {mcts_q_str}'
             return move, eval_str
 
     def update_model(self, moves, lambda_val, batch_size):
@@ -468,7 +477,7 @@ class TDAgent():
                 ]
                 
                 # Set a timeout for getting results (30 minutes per worker)
-                timeout_per_worker = 1800  
+                timeout_per_worker = 3600 # Increased timeout to 1 hour
                 game_player_pool.close()
                 
                 # Safely collect results with timeout
@@ -608,7 +617,8 @@ class TDAgent():
             # Handle potential tuple return (value, policy)
             if isinstance(prediction, tuple):
                 prediction = prediction[0]
-            return prediction.cpu().numpy()
+            # Return the scalar value
+            return prediction.cpu().numpy().item()
 
     def save_model(self, filepath):
         torch.save(self.NN.state_dict(), filepath)

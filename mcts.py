@@ -319,6 +319,13 @@ class MCTS:
                             v = nn_output.squeeze().cpu().item()
                         pi = np.ones(checkersBoard.CheckersBoard.action_size) # Placeholder for uniform policy generation
 
+                    # --- Apply Softmax to policy logits ---
+                    # Convert raw logits (pi) to probabilities using Softmax
+                    # Do this *before* masking
+                    if pi is not None and self.use_policy_head: # Check if pi exists and policy head is used
+                         pi_tensor = torch.from_numpy(pi).float() # Convert back to tensor if needed
+                         pi = torch.softmax(pi_tensor, dim=0).numpy() # Apply softmax
+
                     # --- Validate and Normalize Policy ---
                     valids_mask = np.zeros(checkersBoard.CheckersBoard.action_size)
                     for _, idx in valid_moves: valids_mask[int(idx)] = 1
@@ -335,6 +342,11 @@ class MCTS:
                     else:
                         pi = pi * valids_mask # Mask policy with valid moves.
                         sum_pi = np.sum(pi)
+                        # --- DEBUG PRINTS ---
+                        if depth == 0: # Only print for the root node expansion
+                            print(f"[MCTS Debug Expansion D{depth}] Raw NN pi (masked): {pi[pi>0]}")
+                            print(f"[MCTS Debug Expansion D{depth}] Sum of masked pi: {sum_pi}")
+                        # --- END DEBUG PRINTS ---
                         if sum_pi > 1e-6: # Normalize if sum is non-negligible
                             pi /= sum_pi
                         else:

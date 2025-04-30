@@ -39,14 +39,16 @@ if __name__ == '__main__':
 
     freeze_support()
 
-    model_file = 'res64x3.pth'
+    model_file = 'res64x4_dual.pth'
+    num_residual_blocks = 4 # Match the likely saved model structure
+    width = 64 # Match the likely saved model structure
 
     profile = False
     if profile:
         pr =cProfile.Profile()
         pr.enable()
 
-    q_learning_only = True
+    q_learning_only = False
     lr_schedule = {}
     opponent_depth = 2
     opponent_depth_increase_interval = 1
@@ -78,7 +80,7 @@ if __name__ == '__main__':
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {device}")
         
-        TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file, q_learning=q_learning_only)
+        TD_agent = TDAgent.TDAgent(lr=0.00001, model_filename=model_file, q_learning=q_learning_only, width=width, residual_blocks=num_residual_blocks)
     except Exception as e:
         print(f"Error initializing TDAgent with model {model_file}: {e}")
         import traceback
@@ -95,7 +97,7 @@ if __name__ == '__main__':
     epoch_per_iteration = 1
     kld_threshold = 0.00288
     target_average_num_sims = 200
-    calibration_runs = 2
+    calibration_runs = 1
     wins = []
     draws = []
     losses = []
