@@ -32,8 +32,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create a new PyTorch ResNN model file.')
     parser.add_argument('--width', type=int, default=64, help='Width of the neural network (number of filters)')
     parser.add_argument('--blocks', type=int, default=3, help='Number of residual blocks')
-    parser.add_argument('--q-learning-only', type=bool, default=True, help='Whether to use only value head (True) or also policy head (False)')
+    parser.add_argument('--use-policy-head', action='store_true', 
+                        help='Include the policy head (sets q_learning_only to False)')
     parser.add_argument('--output', type=str, default='res64x3.pth', help='Output file path')
     
     args = parser.parse_args()
-    create_model(args.width, args.blocks, args.q_learning_only, args.output)
+    
+    # Determine q_learning_only based on the flag
+    # If --use-policy-head is present, args.use_policy_head is True, so q_learning_only becomes False.
+    # If --use-policy-head is absent, args.use_policy_head is False, so q_learning_only becomes True.
+    q_learning_only_flag = not args.use_policy_head 
+    
+    create_model(args.width, args.blocks, q_learning_only_flag, args.output)
